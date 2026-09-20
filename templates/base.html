@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>{% block title %}Inicio{% endblock %} - Control de Gastos</title>
+
+    <!-- Apply the saved theme before painting the page (avoids the flash) -->
+    <script>
+        (function () {
+            try {
+                if (localStorage.getItem("theme") === "dark") {
+                    document.documentElement.classList.add("dark-mode");
+                }
+            } catch (error) {}
+        })();
+    </script>
+
+    <link rel="stylesheet" href="/static/style.css">
+
+    {% block head %}{% endblock %}
+</head>
+
+<body>
+
+<div class="app-layout">
+
+    <!-- ======================================================
+         SIDEBAR (shared by every page)
+         ====================================================== -->
+
+    <aside class="sidebar">
+
+        <div class="sidebar-header">
+            <p class="brand">Control de Gastos</p>
+            <p class="brand-subtitle">Finanzas personales</p>
+        </div>
+
+        <nav class="sidebar-nav" aria-label="Navegación principal">
+
+            <a href="/"
+               class="nav-item {% if active_page == 'dashboard' %}active{% endif %}"
+               {% if active_page == 'dashboard' %}aria-current="page"{% endif %}>
+                <span class="nav-icon">📊</span>
+                <span>Dashboard</span>
+            </a>
+
+            <a href="/expenses"
+               class="nav-item {% if active_page == 'expenses' %}active{% endif %}"
+               {% if active_page == 'expenses' %}aria-current="page"{% endif %}>
+                <span class="nav-icon">💸</span>
+                <span>Gastos</span>
+            </a>
+
+            <a href="/income"
+               class="nav-item {% if active_page == 'income' %}active{% endif %}"
+               {% if active_page == 'income' %}aria-current="page"{% endif %}>
+                <span class="nav-icon">💰</span>
+                <span>Ingresos</span>
+            </a>
+
+            <a href="/categories"
+               class="nav-item {% if active_page == 'categories' %}active{% endif %}"
+               {% if active_page == 'categories' %}aria-current="page"{% endif %}>
+                <span class="nav-icon">🏷️</span>
+                <span>Categorías</span>
+            </a>
+
+        </nav>
+
+        <div class="sidebar-footer">
+
+            <button
+                type="button"
+                id="themeToggle"
+                class="theme-toggle"
+                aria-label="Cambiar entre modo claro y oscuro"
+            >
+                <span class="nav-icon" data-theme-icon>🌙</span>
+                <span data-theme-label>Modo oscuro</span>
+            </button>
+
+        </div>
+
+    </aside>
+
+
+    <!-- ======================================================
+         MAIN CONTENT
+         ====================================================== -->
+
+    <main class="main-content">
+
+        {% block content %}{% endblock %}
+
+        <footer class="app-footer">
+            <p>Control de Gastos · Finanzas personales</p>
+        </footer>
+
+    </main>
+
+</div>
+
+<script src="/static/app.js"></script>
+<script src="/static/table.js"></script>
+
+{% block scripts %}{% endblock %}
+
+</body>
+
+</html>

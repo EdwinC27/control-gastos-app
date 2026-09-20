@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+
+{% block title %}Categorías{% endblock %}
+
+{% block content %}
+
+<header class="page-header">
+    <div>
+        <h1>Categorías</h1>
+        <p class="page-description">
+            Crea, renombra u oculta categorías sin tocar el código.
+        </p>
+    </div>
+</header>
+
+
+<!-- =========================================================
+     ADD
+     ========================================================= -->
+
+<section class="card">
+
+    <div class="card-header">
+        <div>
+            <h2>Nueva categoría</h2>
+            <p>Aparecerá en el formulario de gastos.</p>
+        </div>
+    </div>
+
+    <form method="post" action="/categories/add" class="form">
+
+        {{ m.error_list(errors) }}
+        {{ m.success_message(message) }}
+
+        <div class="form-grid">
+            <div class="form-group form-group-wide">
+                <label for="name">Nombre</label>
+                <input
+                    type="text"
+                    id="name"
+                    name="name"
+                    placeholder="Ej. Viajes"
+                    maxlength="{{ MAX_LENGTH }}"
+                    required
+                >
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="button button-primary">
+                + Agregar categoría
+            </button>
+        </div>
+
+    </form>
+
+</section>
+
+
+<!-- =========================================================
+     LIST
+     ========================================================= -->
+
+<section class="card">
+
+    <div class="card-header">
+        <div>
+            <h2>Catálogo</h2>
+            <p>
+                Una categoría oculta deja de ofrecerse en el formulario,
+                pero los gastos que ya la usan la conservan.
+            </p>
+        </div>
+
+        <div class="record-count">
+            {{ categories|length }}
+            {% if categories|length == 1 %}categoría{% else %}categorías{% endif %}
+        </div>
+    </div>
+
+    {% if categories %}
+
+    <div class="table-container">
+        <table>
+
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th class="text-center">Gastos que la usan</th>
+                    <th>Estado</th>
+                    <th class="text-center">Acciones</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for category in categories %}
+                <tr class="{% if category.hidden == 'true' %}row-inactive{% endif %}">
+
+                    <td>
+                        <form method="post" action="/categories/rename" class="inline-form">
+                            <input type="hidden" name="name" value="{{ category.name }}">
+                            <input
+                                type="text"
+                                name="new_name"
+                                value="{{ category.name }}"
+                                maxlength="{{ MAX_LENGTH }}"
+                                aria-label="Nombre de {{ category.name }}"
+                                required
+                            >
+                            <button type="submit" class="button button-secondary button-sm">
+                                Guardar
+                            </button>
+                        </form>
+                    </td>
+
+                    <td class="text-center">{{ category.uses }}</td>
+
+                    <td>
+                        {% if category.hidden == "true" %}
+                        <span class="badge badge-neutral">Oculta</span>
+                        {% else %}
+                        <span class="badge badge-success">Visible</span>
+                        {% endif %}
+                    </td>
+
+                    <td class="col-actions">
+                        <div class="table-actions">
+
+                            <form method="post" action="/categories/toggle">
+                                <input type="hidden" name="name" value="{{ category.name }}">
+                                <button type="submit" class="button button-ghost button-sm">
+                                    {% if category.hidden == "true" %}👁️ Mostrar{% else %}🙈 Ocultar{% endif %}
+                                </button>
+                            </form>
+
+                            <form
+                                method="post"
+                                action="/categories/delete"
+                                data-confirm="¿Eliminar la categoría «{{ category.name }}»?"
+                            >
+                                <input type="hidden" name="name" value="{{ category.name }}">
+                                <button
+                                    type="submit"
+                                    class="button button-danger button-sm"
+                                    title="Eliminar"
+                                    aria-label="Eliminar {{ category.name }}"
+                                    {% if category.uses %}disabled{% endif %}
+                                >
+                                    🗑️
+                                </button>
+                            </form>
+
+                        </div>
+                    </td>
+
+                </tr>
+                {% endfor %}
+            </tbody>
+
+        </table>
+    </div>
+
+    {% else %}
+
+    <div class="empty-state">
+        <div class="empty-state-icon">🏷️</div>
+        <h3>El catálogo está vacío</h3>
+        <p>Agrega tu primera categoría con el formulario de arriba.</p>
+    </div>
+
+    {% endif %}
+
+</section>
+
+
+<!-- =========================================================
+     LOOSE CATEGORIES
+     ========================================================= -->
+
+{% if orphans %}
+<section class="card">
+
+    <div class="card-header">
+        <div>
+            <h2>Categorías fuera del catálogo</h2>
+            <p>
+                Están escritas en algún gasto pero no en el catálogo.
+                Agrégalas para poder usarlas y administrarlas.
+            </p>
+        </div>
+    </div>
+
+    <div class="card-body">
+        <div class="table-actions">
+            {% for name in orphans %}
+            <form method="post" action="/categories/adopt">
+                <input type="hidden" name="name" value="{{ name }}">
+                <button type="submit" class="button button-secondary button-sm">
+                    + {{ name }}
+                </button>
+            </form>
+            {% endfor %}
+        </div>
+    </div>
+
+</section>
+{% endif %}
+
+{% endblock %}

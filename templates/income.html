@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+
+{% block title %}Ingresos{% endblock %}
+
+{% block content %}
+
+<header class="page-header">
+    <div>
+        <h1>Ingresos</h1>
+        <p class="page-description">
+            Administra tus fuentes de ingreso y su periodicidad.
+        </p>
+    </div>
+</header>
+
+
+<!-- =========================================================
+     FORM
+     ========================================================= -->
+
+<section class="card">
+
+    <div class="card-header">
+        <div>
+            <h2>Agregar ingreso</h2>
+            <p>
+                Registra un salario, honorarios, contrato, inversión
+                u otra fuente de ingresos.
+            </p>
+        </div>
+    </div>
+
+    <form method="post" action="/income/add" class="form">
+
+        {{ m.error_list(errors) }}
+
+        {{ m.income_fields(values, today) }}
+
+        <div class="form-actions">
+            <button type="submit" class="button button-primary">
+                + Agregar ingreso
+            </button>
+        </div>
+
+    </form>
+
+</section>
+
+
+<!-- =========================================================
+     LIST
+     ========================================================= -->
+
+<section class="card">
+
+    <div class="card-header">
+        <div>
+            <h2>Ingresos registrados</h2>
+            <p>
+                Los ingresos inactivos aparecen al final y no se cuentan
+                en el dashboard. Haz clic en el título de una columna
+                para ordenar.
+            </p>
+        </div>
+    </div>
+
+    {% if entries %}
+
+    {{ m.table_toolbar(
+        "income",
+        [
+            ("frequency", "Frecuencia", FREQUENCIES),
+            ("status", "Estado", [("true", "Activos"), ("false", "Inactivos")])
+        ]
+    ) }}
+
+    <div class="table-container">
+        <table data-table="income">
+
+            <thead>
+                <tr>
+                    <th data-sort="text">Concepto</th>
+                    <th data-sort="text">Frecuencia</th>
+                    <th data-sort="date">Vigencia</th>
+                    <th data-sort="text">Estado</th>
+                    <th class="text-right" data-sort="number">Monto</th>
+                    <th class="text-center">Acciones</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for entry in entries %}
+                <tr
+                    class="{% if entry.active != 'true' %}row-inactive{% endif %}"
+                    data-frequency="{{ entry.frequency }}"
+                    data-status="{{ entry.active }}"
+                    data-search="{{ entry.concept }} {{ entry.notes }}"
+                >
+
+                    <td data-value="{{ entry.concept }}">
+                        <strong>{{ entry.concept }}</strong>
+                        {% if entry.notes %}
+                        <small class="table-note">{{ entry.notes }}</small>
+                        {% endif %}
+                    </td>
+
+                    <td data-value="{{ entry.frequency | frequency_label }}">
+                        {% if entry.frequency == "monthly" %}
+                        <span class="badge badge-success">Mensual</span>
+                        {% elif entry.frequency == "yearly" %}
+                        <span class="badge badge-warning">Anual</span>
+                        {% else %}
+                        <span class="badge badge-neutral">Único</span>
+                        {% endif %}
+                    </td>
+
+                    <td class="nowrap" data-value="{{ entry.start_date }}">
+                        {{ entry.start_date | date_mx }}
+                        {% if entry.end_date %}
+                        <small class="table-note">hasta {{ entry.end_date | date_mx }}</small>
+                        {% endif %}
+                    </td>
+
+                    <td data-value="{% if entry.active == 'true' %}0{% else %}1{% endif %}">
+                        {% if entry.active == "true" %}
+                        <span class="badge badge-success">Activo</span>
+                        {% else %}
+                        <span class="badge badge-neutral">Inactivo</span>
+                        {% endif %}
+                    </td>
+
+                    <td class="text-right amount amount-positive" data-value="{{ entry.amount }}">
+                        {{ entry.amount | mxn }}
+                    </td>
+
+                    <td class="col-actions">
+                        {{ m.row_actions("income", entry) }}
+                    </td>
+
+                </tr>
+                {% endfor %}
+            </tbody>
+
+        </table>
+    </div>
+
+    <div class="empty-state" data-table-empty="income" hidden>
+        <div class="empty-state-icon">🔎</div>
+        <h3>Ningún ingreso coincide con el filtro</h3>
+        <p>Cambia la búsqueda o pulsa «Limpiar».</p>
+    </div>
+
+    {% else %}
+
+    <div class="empty-state">
+        <div class="empty-state-icon">💰</div>
+        <h3>Todavía no tienes ingresos registrados</h3>
+        <p>Usa el formulario de arriba para agregar el primero.</p>
+    </div>
+
+    {% endif %}
+
+</section>
+
+
+{{ m.frequency_help("ingreso") }}
+
+{% endblock %}

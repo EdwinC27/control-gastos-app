@@ -1,0 +1,454 @@
+{# ============================================================
+   SHARED MACROS
+   Usage:  {% import "_macros.html" as m %}
+   ============================================================ #}
+
+
+{# ------------------------------------------------------------
+   Validation errors
+   ------------------------------------------------------------ #}
+{% macro error_list(errors) %}
+    {% if errors %}
+    <div class="alert alert-danger" role="alert">
+        <strong>Revisa la información:</strong>
+        <ul>
+            {% for error in errors %}
+            <li>{{ error }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+{% endmacro %}
+
+
+{# ------------------------------------------------------------
+   Confirmation message
+   ------------------------------------------------------------ #}
+{% macro success_message(message) %}
+    {% if message %}
+    <div class="alert alert-success" role="status">{{ message }}</div>
+    {% endif %}
+{% endmacro %}
+
+
+{# ------------------------------------------------------------
+   EXPENSE form fields (add and edit)
+   v           -> current values
+   today       -> default value for the start date
+   with_status -> show the active / inactive selector
+   ------------------------------------------------------------ #}
+{% macro expense_fields(v, today="", with_status=false) %}
+<div class="form-grid">
+
+    <div class="form-group form-group-wide">
+        <label for="concept">Concepto</label>
+        <input
+            type="text"
+            id="concept"
+            name="concept"
+            value="{{ v.concept or '' }}"
+            placeholder="Ej. Pago de terreno"
+            maxlength="120"
+            required
+        >
+    </div>
+
+    <div class="form-group">
+        <label for="category">Categoría</label>
+        <select id="category" name="category" required>
+            <option value="" {% if not v.category %}selected{% endif %}>
+                Selecciona una categoría
+            </option>
+            {% for category in category_options(v.category) %}
+            <option value="{{ category }}" {% if v.category == category %}selected{% endif %}>
+                {{ category }}
+            </option>
+            {% endfor %}
+        </select>
+        <small class="field-hint">
+            <a href="/categories">Administrar categorías</a>
+        </small>
+    </div>
+
+    <div class="form-group">
+        <label for="amount">Monto por pago</label>
+        <div class="input-money">
+            <span>$</span>
+            <input
+                type="number"
+                id="amount"
+                name="amount"
+                value="{{ v.amount or '' }}"
+                placeholder="0.00"
+                min="0.01"
+                step="0.01"
+                required
+            >
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label for="type">Tipo de gasto</label>
+        <select id="type" name="type" required>
+            {% for value, label in EXPENSE_TYPES %}
+            <option value="{{ value }}" {% if (v.type | expense_type_label) == label %}selected{% endif %}>
+                {{ label }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="frequency">Frecuencia</label>
+        <select id="frequency" name="frequency" required>
+            {% for value, label in FREQUENCIES %}
+            <option value="{{ value }}" {% if (v.frequency | frequency_label) == label %}selected{% endif %}>
+                {{ label }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="start_date">Fecha de inicio (primer pago)</label>
+        <input
+            type="date"
+            id="start_date"
+            name="start_date"
+            value="{{ v.start_date or today }}"
+            required
+        >
+    </div>
+
+    <div class="form-group">
+        <label for="installments">
+            Número de pagos
+            <span class="optional">(opcional)</span>
+        </label>
+        <input
+            type="number"
+            id="installments"
+            name="installments"
+            value="{{ v.installments or '' }}"
+            placeholder="Ej. 48"
+            min="1"
+            max="{{ MAX_INSTALLMENTS }}"
+            step="1"
+        >
+        <small class="field-hint" data-installments-hint>
+            Déjalo vacío si el gasto no tiene fin. Si lo llenas, la app
+            calcula sola la fecha final y el saldo pendiente.
+        </small>
+    </div>
+
+    <div class="form-group">
+        <label for="end_date">
+            Fecha de finalización
+            <span class="optional">(opcional)</span>
+        </label>
+        <input
+            type="date"
+            id="end_date"
+            name="end_date"
+            value="{{ v.end_date or '' }}"
+        >
+        <small class="field-hint" data-end-date-hint hidden>
+            La calcula el número de pagos.
+        </small>
+    </div>
+
+    {% if with_status %}
+    <div class="form-group">
+        <label for="active">Estado</label>
+        <select id="active" name="active">
+            {% set active = (v.active or 'true') | lower %}
+            <option value="true" {% if active == 'true' %}selected{% endif %}>Activo</option>
+            <option value="false" {% if active != 'true' %}selected{% endif %}>Inactivo</option>
+        </select>
+    </div>
+    {% endif %}
+
+    <div class="form-group form-group-wide">
+        <label for="notes">
+            Notas
+            <span class="optional">(opcional)</span>
+        </label>
+        <textarea
+            id="notes"
+            name="notes"
+            rows="3"
+            maxlength="500"
+            placeholder="Información adicional..."
+        >{{ v.notes or '' }}</textarea>
+    </div>
+
+</div>
+{% endmacro %}
+
+
+{# ------------------------------------------------------------
+   INCOME form fields (add and edit)
+   ------------------------------------------------------------ #}
+{% macro income_fields(v, today="", with_status=false) %}
+<div class="form-grid">
+
+    <div class="form-group form-group-wide">
+        <label for="concept">Concepto</label>
+        <input
+            type="text"
+            id="concept"
+            name="concept"
+            value="{{ v.concept or '' }}"
+            placeholder="Ej. Salario"
+            maxlength="120"
+            required
+        >
+    </div>
+
+    <div class="form-group">
+        <label for="amount">Monto mensual o por pago</label>
+        <div class="input-money">
+            <span>$</span>
+            <input
+                type="number"
+                id="amount"
+                name="amount"
+                value="{{ v.amount or '' }}"
+                placeholder="0.00"
+                min="0.01"
+                step="0.01"
+                required
+            >
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label for="frequency">Frecuencia</label>
+        <select id="frequency" name="frequency" required>
+            {% for value, label in FREQUENCIES %}
+            <option value="{{ value }}" {% if (v.frequency | frequency_label) == label %}selected{% endif %}>
+                {{ label }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="start_date">Fecha de inicio</label>
+        <input
+            type="date"
+            id="start_date"
+            name="start_date"
+            value="{{ v.start_date or today }}"
+            required
+        >
+    </div>
+
+    <div class="form-group">
+        <label for="end_date">
+            Fecha de finalización
+            <span class="optional">(opcional)</span>
+        </label>
+        <input
+            type="date"
+            id="end_date"
+            name="end_date"
+            value="{{ v.end_date or '' }}"
+        >
+    </div>
+
+    {% if with_status %}
+    <div class="form-group">
+        <label for="active">Estado</label>
+        <select id="active" name="active">
+            {% set active = (v.active or 'true') | lower %}
+            <option value="true" {% if active == 'true' %}selected{% endif %}>Activo</option>
+            <option value="false" {% if active != 'true' %}selected{% endif %}>Inactivo</option>
+        </select>
+    </div>
+    {% endif %}
+
+    <div class="form-group form-group-wide">
+        <label for="notes">
+            Notas
+            <span class="optional">(opcional)</span>
+        </label>
+        <textarea
+            id="notes"
+            name="notes"
+            rows="3"
+            maxlength="500"
+            placeholder="Información adicional sobre este ingreso..."
+        >{{ v.notes or '' }}</textarea>
+    </div>
+
+</div>
+{% endmacro %}
+
+
+{# ------------------------------------------------------------
+   Row buttons: toggle, duplicate, edit and delete.
+   section -> "expenses" or "income"
+   ------------------------------------------------------------ #}
+{% macro row_actions(section, record) %}
+<div class="table-actions">
+
+    {% set is_active = record.active == "true" %}
+
+    <form method="post" action="/{{ section }}/toggle/{{ record.id }}">
+        <button
+            type="submit"
+            class="button button-ghost button-sm"
+            title="{% if is_active %}Desactivar{% else %}Activar{% endif %} {{ record.concept }}"
+            aria-label="{% if is_active %}Desactivar{% else %}Activar{% endif %} {{ record.concept }}"
+        >
+            {% if is_active %}⏸️{% else %}▶️{% endif %}
+        </button>
+    </form>
+
+    <form method="post" action="/{{ section }}/duplicate/{{ record.id }}">
+        <button
+            type="submit"
+            class="button button-ghost button-sm"
+            title="Duplicar {{ record.concept }}"
+            aria-label="Duplicar {{ record.concept }}"
+        >
+            📋
+        </button>
+    </form>
+
+    <a
+        href="/{{ section }}/edit/{{ record.id }}"
+        class="button button-secondary button-sm"
+    >
+        ✏️ Editar
+    </a>
+
+    <form
+        method="post"
+        action="/{{ section }}/delete/{{ record.id }}"
+        data-confirm="¿Eliminar «{{ record.concept }}»? Esta acción no se puede deshacer."
+    >
+        <button
+            type="submit"
+            class="button button-danger button-sm"
+            aria-label="Eliminar {{ record.concept }}"
+            title="Eliminar"
+        >
+            🗑️
+        </button>
+    </form>
+
+</div>
+{% endmacro %}
+
+
+{# ------------------------------------------------------------
+   Search and filter bar of a table
+   name    -> same value as the table's data-table attribute
+   filters -> list of (field, label, [options])
+   ------------------------------------------------------------ #}
+{% macro table_toolbar(name, filters=[]) %}
+<div class="table-toolbar" data-table-toolbar="{{ name }}">
+
+    <div class="toolbar-search">
+        <span aria-hidden="true">🔎</span>
+        <input
+            type="search"
+            data-table-search
+            placeholder="Buscar por concepto, categoría o notas..."
+            aria-label="Buscar en la tabla"
+        >
+    </div>
+
+    {% for field, label, options in filters %}
+    <label class="toolbar-filter">
+        <span>{{ label }}</span>
+        <select data-table-filter="{{ field }}">
+            <option value="">Todos</option>
+            {% for value, text in options %}
+            <option value="{{ value }}">{{ text }}</option>
+            {% endfor %}
+        </select>
+    </label>
+    {% endfor %}
+
+    <button type="button" class="button button-secondary button-sm" data-table-clear>
+        Limpiar
+    </button>
+
+    <span class="record-count" data-table-count></span>
+
+</div>
+{% endmacro %}
+
+
+{# ------------------------------------------------------------
+   Frequency help card
+   subject -> "gasto" or "ingreso"
+   ------------------------------------------------------------ #}
+{% macro frequency_help(subject) %}
+<section class="information-card">
+
+    <h3>¿Cómo funciona la frecuencia?</h3>
+
+    <div class="information-grid">
+
+        <div class="information-item">
+            <div class="information-icon">🔄</div>
+            <div>
+                <h4>Mensual</h4>
+                <p>El {{ subject }} se cuenta todos los meses mientras esté activo.</p>
+            </div>
+        </div>
+
+        <div class="information-item">
+            <div class="information-icon">📅</div>
+            <div>
+                <h4>Anual</h4>
+                <p>El {{ subject }} se cuenta una vez al año, en el mes de su fecha de inicio.</p>
+            </div>
+        </div>
+
+        <div class="information-item">
+            <div class="information-icon">1️⃣</div>
+            <div>
+                <h4>Único</h4>
+                <p>El {{ subject }} se cuenta solo en el mes y año de su fecha de inicio.</p>
+            </div>
+        </div>
+
+        {% if subject == "gasto" %}
+        <div class="information-item">
+            <div class="information-icon">🧮</div>
+            <div>
+                <h4>Número de pagos</h4>
+                <p>
+                    Para lo que pagas a plazos (un terreno, un mueble).
+                    La app calcula la fecha del último pago, cuántos te
+                    faltan y el saldo pendiente.
+                </p>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="information-item">
+            <div class="information-icon">⏳</div>
+            <div>
+                <h4>Fecha de finalización</h4>
+                <p>Después de ese mes, el {{ subject }} deja de contarse.</p>
+            </div>
+        </div>
+
+        <div class="information-item">
+            <div class="information-icon">⏸️</div>
+            <div>
+                <h4>Inactivo</h4>
+                <p>Un {{ subject }} inactivo no se cuenta en ningún mes. Puedes reactivarlo al editarlo.</p>
+            </div>
+        </div>
+
+    </div>
+
+</section>
+{% endmacro %}

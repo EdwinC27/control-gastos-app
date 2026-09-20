@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+
+{% block title %}Editar ingreso{% endblock %}
+
+{% block content %}
+
+{# On validation errors the values typed by the user are shown again #}
+{% set v = values if values else entry %}
+
+<header class="page-header">
+    <div>
+        <h1>Editar ingreso</h1>
+        <p class="page-description">
+            Modifica la información del ingreso seleccionado.
+        </p>
+    </div>
+</header>
+
+
+<section class="card">
+
+    <form method="post" action="/income/edit/{{ entry.id }}" class="form">
+
+        {{ m.error_list(errors) }}
+
+        {{ m.income_fields(v, "", true) }}
+
+        <div class="form-actions">
+            <button type="submit" class="button button-primary">
+                Guardar cambios
+            </button>
+
+            <a href="/income" class="button button-secondary">
+                Cancelar
+            </a>
+        </div>
+
+    </form>
+
+</section>
+
+
+<section class="information-card information-note">
+    <strong>💡 Editando el ingreso #{{ entry.id }}</strong>
+    <p>
+        Los cambios se guardan directamente en <code>data/ingresos.csv</code>.
+        Si marcas el ingreso como inactivo, dejará de contarse en el dashboard.
+    </p>
+</section>
+
+{% endblock %}

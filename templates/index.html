@@ -1,0 +1,747 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+
+<!-- =========================================================
+     HEADER + MONTH PICKER
+     ========================================================= -->
+
+<header class="page-header">
+
+    <div>
+        <h1>Dashboard</h1>
+        <p class="page-description">
+            Resumen financiero de {{ month_name }} {{ year }}
+        </p>
+    </div>
+
+    <form method="get" action="/" class="month-selector">
+
+        <a
+            href="/?month={{ previous_month }}&year={{ previous_year }}"
+            class="button button-secondary button-icon"
+            aria-label="Mes anterior ({{ previous_month_name }})"
+            title="Mes anterior"
+        >←</a>
+
+        <div class="form-group">
+            <label for="month">Mes</label>
+            <select id="month" name="month">
+                {% for number, name in MONTHS %}
+                <option value="{{ number }}" {% if number == month %}selected{% endif %}>
+                    {{ name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="year">Año</label>
+            <input
+                type="number"
+                id="year"
+                name="year"
+                value="{{ year }}"
+                min="{{ MIN_YEAR }}"
+                max="{{ MAX_YEAR }}"
+            >
+        </div>
+
+        <button type="submit" class="button button-primary">Ver mes</button>
+
+        <a
+            href="/?month={{ next_month }}&year={{ next_year }}"
+            class="button button-secondary button-icon"
+            aria-label="Mes siguiente"
+            title="Mes siguiente"
+        >→</a>
+
+        <a href="/" class="button button-secondary">Este mes</a>
+
+    </form>
+
+</header>
+
+
+<!-- =========================================================
+     HEADLINE CARDS
+     ========================================================= -->
+
+<section class="summary-grid">
+
+    <div class="summary-card">
+        <div class="summary-card-label">Ingresos</div>
+        <div class="summary-card-value amount-positive">{{ total_income | mxn }}</div>
+        <div class="summary-card-description">Ingresos registrados en el mes</div>
+    </div>
+
+    <div class="summary-card">
+        <div class="summary-card-label">Gastos</div>
+        <div class="summary-card-value amount-negative">{{ total_expenses | mxn }}</div>
+        <div class="summary-card-description">Total gastado en el mes</div>
+    </div>
+
+    <div class="summary-card">
+        <div class="summary-card-label">Disponible</div>
+        <div class="summary-card-value {% if available >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
+            {{ available | mxn }}
+        </div>
+        <div class="summary-card-description">Dinero restante después de gastos</div>
+    </div>
+
+    <div class="summary-card">
+        <div class="summary-card-label">Estado financiero</div>
+        <div class="summary-card-value">
+            <span class="badge badge-lg {{ status_class }}">{{ status_label }}</span>
+        </div>
+        <div class="summary-card-description">
+            {% if without_income %}
+                Registra un ingreso para calcular el porcentaje
+            {% else %}
+                {{ available_percent | pct }} del ingreso disponible
+            {% endif %}
+        </div>
+    </div>
+
+</section>
+
+
+<!-- =========================================================
+     COMMITTED INCOME
+     ========================================================= -->
+
+<section class="card">
+
+    <div class="card-header">
+        <div>
+            <h3>Ingreso comprometido</h3>
+            <p>Porcentaje de tus ingresos que se va en gastos</p>
+        </div>
+
+        <strong class="card-header-value">
+            {% if without_income %}Sin ingresos{% else %}{{ committed_percent | pct }}{% endif %}
+        </strong>
+    </div>
+
+    <div class="card-body">
+
+        <div
+            class="progress-track"
+            role="progressbar"
+            aria-label="Ingreso comprometido"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-valuenow="{{ '%.0f'|format(bar_percent) }}"
+        >
+            <div
+                class="progress-bar progress-bar--{{ status_level }}"
+                style="width: {{ '%.1f'|format(bar_percent) }}%;"
+            ></div>
+        </div>
+
+        <div class="scale-legend">
+            <span class="scale-item">
+                <i class="dot dot-ok"></i>
+                Positivo: te queda {{ '%.0f'|format(positive_threshold) }}% o más
+            </span>
+            <span class="scale-item">
+                <i class="dot dot-warning"></i>
+                Equilibrado: entre {{ '%.0f'|format(balanced_threshold) }}% y {{ '%.0f'|format(positive_threshold) }}%
+            </span>
+            <span class="scale-item">
+                <i class="dot dot-danger"></i>
+                Déficit: menos del {{ '%.0f'|format(balanced_threshold) }}%
+            </span>
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- =========================================================
+     PLANNED VS. REAL
+     ========================================================= -->
+
+<section class="card" id="month-payments">
+
+    <div class="card-header">
+        <div>
+            <h3>Pagos de {{ month_name }}</h3>
+            <p>Lo que ya saliste a pagar, lo que tienes apartado y lo que falta por juntar</p>
+        </div>
+
+        <strong class="card-header-value {% if payments.pending > 0 %}amount-negative{% else %}amount-positive{% endif %}">
+            {% if payments.pending > 0 %}
+                Faltan {{ payments.pending | mxn }}
+            {% else %}
+                Todo cubierto
+            {% endif %}
+        </strong>
+    </div>
+
+    <div class="card-body">
+
+        <div class="summary-grid summary-grid-3">
+
+            <div class="summary-card">
+                <div class="summary-card-label">Pagado</div>
+                <div class="summary-card-value amount-positive">{{ payments.paid | mxn }}</div>
+                <div class="summary-card-description">{{ payments.n_paid }} gasto(s)</div>
+            </div>
+
+            <div class="summary-card">
+                <div class="summary-card-label">Apartado</div>
+                <div class="summary-card-value">{{ payments.reserved | mxn }}</div>
+                <div class="summary-card-description">
+                    {{ payments.n_reserved }} gasto(s) con el dinero listo
+                </div>
+            </div>
+
+            <div class="summary-card">
+                <div class="summary-card-label">Falta por juntar</div>
+                <div class="summary-card-value {% if payments.pending > 0 %}amount-negative{% endif %}">
+                    {{ payments.pending | mxn }}
+                </div>
+                <div class="summary-card-description">{{ payments.n_pending }} gasto(s)</div>
+            </div>
+
+        </div>
+
+        <div
+            class="progress-track"
+            role="progressbar"
+            aria-label="Avance de pagos del mes"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-valuenow="{{ '%.0f'|format(payments.covered_percent) }}"
+        >
+            <div
+                class="progress-bar progress-bar--ok"
+                style="width: {{ '%.1f'|format(payments.covered_percent) }}%;"
+            ></div>
+        </div>
+
+        <p class="progress-caption">
+            {{ payments.covered_percent | pct }} del mes cubierto
+            ({{ payments.covered | mxn }} de {{ payments.total | mxn }})
+        </p>
+
+        {% if expenses %}
+        <div class="table-actions">
+
+            <form method="post" action="/payments/status-all">
+                <input type="hidden" name="month" value="{{ month }}">
+                <input type="hidden" name="year" value="{{ year }}">
+                <input type="hidden" name="status" value="paid">
+                <button type="submit" class="button button-secondary button-sm">
+                    Marcar todo como pagado
+                </button>
+            </form>
+
+            <form
+                method="post"
+                action="/payments/status-all"
+                data-confirm="¿Regresar todos los gastos de {{ month_name }} a «falta por juntar»?"
+            >
+                <input type="hidden" name="month" value="{{ month }}">
+                <input type="hidden" name="year" value="{{ year }}">
+                <input type="hidden" name="status" value="pending">
+                <button type="submit" class="button button-ghost button-sm">
+                    Reiniciar el mes
+                </button>
+            </form>
+
+        </div>
+        {% endif %}
+
+    </div>
+
+</section>
+
+
+<!-- =========================================================
+     INSTALLMENT PLANS
+     ========================================================= -->
+
+<section class="card">
+
+    <div class="card-header">
+        <div>
+            <h3>Pagos a plazos</h3>
+            <p>Cuándo terminas de pagar cada cosa y cuánto te falta</p>
+        </div>
+
+        {% if plans %}
+        <strong class="card-header-value amount-negative">
+            {{ plans_balance | mxn }}
+        </strong>
+        {% endif %}
+    </div>
+
+    {% if plans %}
+
+    <div class="table-container">
+        <table data-table="plans">
+
+            <thead>
+                <tr>
+                    <th data-sort="text">Concepto</th>
+                    <th data-sort="number">Avance</th>
+                    <th data-sort="date">Último pago</th>
+                    <th class="text-right" data-sort="number">Pago</th>
+                    <th class="text-right" data-sort="number">Saldo pendiente</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for plan in plans %}
+                <tr class="{% if plan.finished %}row-inactive{% endif %}">
+
+                    <td data-value="{{ plan.concept }}">
+                        <a href="/expenses/edit/{{ plan.id }}" class="table-link">
+                            {{ plan.concept }}
+                        </a>
+                        <small class="table-note">{{ plan.category }}</small>
+                    </td>
+
+                    <td data-value="{{ plan.percent }}">
+                        <div class="installment-progress">
+                            <span class="nowrap">
+                                {{ plan.paid }} de {{ plan.installments }} pagos
+                            </span>
+                            <div class="progress-track progress-track-sm">
+                                <div
+                                    class="progress-bar {% if plan.finished %}progress-bar--ok{% endif %}"
+                                    style="width: {{ '%.1f'|format(plan.percent) }}%;"
+                                ></div>
+                            </div>
+                        </div>
+                    </td>
+
+                    <td class="nowrap" data-value="{{ plan.end_date }}">
+                        {% if plan.finished %}
+                        <span class="badge badge-success">Liquidado</span>
+                        {% else %}
+                        {{ plan.end_date | month_year }}
+                        <small class="table-note">faltan {{ plan.remaining }} pago(s)</small>
+                        {% endif %}
+                    </td>
+
+                    <td class="text-right amount" data-value="{{ plan.amount }}">
+                        {{ plan.amount | mxn }}
+                    </td>
+
+                    <td class="text-right amount {% if not plan.finished %}amount-negative{% endif %}"
+                        data-value="{{ plan.balance }}">
+                        {{ plan.balance | mxn }}
+                    </td>
+
+                </tr>
+                {% endfor %}
+            </tbody>
+
+        </table>
+    </div>
+
+    {% else %}
+
+    <div class="empty-state">
+        <p>
+            No tienes gastos a plazos. Agrega el «número de pagos» a un
+            gasto mensual o anual y aquí verás cuándo lo terminas de pagar.
+        </p>
+    </div>
+
+    {% endif %}
+
+</section>
+
+
+<!-- =========================================================
+     FIXED / EXTRAORDINARY / COMPARISON
+     ========================================================= -->
+
+<section class="summary-grid summary-grid-3">
+
+    <div class="summary-card">
+        <div class="summary-card-label">Gastos fijos</div>
+        <div class="summary-card-value">{{ total_fixed | mxn }}</div>
+        <div class="summary-card-description">Compromisos recurrentes</div>
+    </div>
+
+    <div class="summary-card">
+        <div class="summary-card-label">Extraordinarios</div>
+        <div class="summary-card-value">{{ total_extraordinary | mxn }}</div>
+        <div class="summary-card-description">Gastos no recurrentes</div>
+    </div>
+
+    <div class="summary-card">
+        <div class="summary-card-label">Gastos vs. mes anterior</div>
+
+        {% if expenses_change is none %}
+
+            <div class="summary-card-value">—</div>
+            <div class="summary-card-description">
+                No hay gastos en {{ previous_month_name }} para comparar
+            </div>
+
+        {% else %}
+
+            <div class="summary-card-value
+                {% if expenses_change > 0 %}amount-negative{% elif expenses_change < 0 %}amount-positive{% endif %}">
+                {{ '%+.1f'|format(expenses_change) }}%
+            </div>
+            <div class="summary-card-description">
+                {{ previous_month_name }}: {{ previous_total | mxn }}
+            </div>
+
+        {% endif %}
+    </div>
+
+</section>
+
+
+<!-- =========================================================
+     CHARTS: CATEGORIES AND INCOME VS. EXPENSES
+     ========================================================= -->
+
+<div class="dashboard-columns">
+
+    <section class="card">
+
+        <div class="card-header">
+            <div>
+                <h3>Gastos por categoría</h3>
+                <p>Distribución de tus gastos del mes</p>
+            </div>
+        </div>
+
+        {% if breakdown %}
+        <div class="card-body">
+            <div class="chart-box">
+                <canvas id="categoriesChart" role="img" aria-label="Gráfica de gastos por categoría"></canvas>
+            </div>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p>No hay gastos registrados para este mes.</p>
+        </div>
+        {% endif %}
+
+    </section>
+
+    <section class="card">
+
+        <div class="card-header">
+            <div>
+                <h3>Ingresos vs. gastos</h3>
+                <p>Comparación del dinero que entra y sale</p>
+            </div>
+        </div>
+
+        <div class="card-body">
+            <div class="chart-box">
+                <canvas id="incomeExpensesChart" role="img" aria-label="Gráfica de ingresos contra gastos"></canvas>
+            </div>
+        </div>
+
+    </section>
+
+</div>
+
+
+<!-- =========================================================
+     CATEGORY BREAKDOWN AND LARGEST EXPENSES
+     ========================================================= -->
+
+<div class="dashboard-columns">
+
+    <section class="card">
+
+        <div class="card-header">
+            <div>
+                <h3>Detalle por categoría</h3>
+                <p>Cuánto representa cada categoría del total gastado</p>
+            </div>
+        </div>
+
+        {% if breakdown %}
+        <div class="card-body">
+            <div class="category-list">
+
+                {% for item in breakdown %}
+                <div class="category-item">
+
+                    <div class="category-item-header">
+                        <span>{{ item.category }}</span>
+                        <strong>
+                            {{ item.amount | mxn }}
+                            <small class="text-light">({{ item.percent | pct }})</small>
+                        </strong>
+                    </div>
+
+                    <div class="progress-track">
+                        <div class="progress-bar" style="width: {{ '%.1f'|format(item.percent) }}%;"></div>
+                    </div>
+
+                </div>
+                {% endfor %}
+
+            </div>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p>No hay gastos registrados para este mes.</p>
+        </div>
+        {% endif %}
+
+    </section>
+
+    <section class="card">
+
+        <div class="card-header">
+            <div>
+                <h3>Gastos más grandes</h3>
+                <p>Tus 5 gastos de mayor monto</p>
+            </div>
+        </div>
+
+        {% if largest_expenses %}
+        <div class="card-body">
+            <div class="large-expense-list">
+
+                {% for expense in largest_expenses %}
+                <div class="large-expense-item">
+
+                    <div>
+                        <strong>{{ expense.concept }}</strong>
+                        <span>{{ expense.category }}</span>
+                    </div>
+
+                    <strong class="amount-negative">{{ expense.value | mxn }}</strong>
+
+                </div>
+                {% endfor %}
+
+            </div>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p>No hay gastos registrados para este mes.</p>
+        </div>
+        {% endif %}
+
+    </section>
+
+</div>
+
+
+<!-- =========================================================
+     MONTHLY TREND
+     ========================================================= -->
+
+<section class="card">
+
+    <div class="card-header">
+        <div>
+            <h3>Evolución mensual</h3>
+            <p>Ingresos, gastos y dinero disponible durante {{ year }}</p>
+        </div>
+    </div>
+
+    <div class="card-body">
+        <div class="chart-box chart-box-lg">
+            <canvas id="trendChart" role="img" aria-label="Evolución mensual de ingresos, gastos y disponible"></canvas>
+        </div>
+    </div>
+
+</section>
+
+
+<!-- =========================================================
+     EXPENSES OF THE MONTH (with their payment status)
+     ========================================================= -->
+
+<section class="card">
+
+    <div class="card-header">
+        <div>
+            <h3>Gastos de {{ month_name }}</h3>
+            <p>Marca cada gasto según si ya lo pagaste, ya lo apartaste o te falta juntarlo</p>
+        </div>
+
+        <span class="record-count">
+            {{ expenses|length }} {% if expenses|length == 1 %}registro{% else %}registros{% endif %}
+        </span>
+    </div>
+
+    {% if expenses %}
+    <div class="table-container">
+        <table data-table="month-expenses">
+            <thead>
+                <tr>
+                    <th data-sort="text">Concepto</th>
+                    <th data-sort="text">Categoría</th>
+                    <th data-sort="text">Tipo</th>
+                    <th class="text-right" data-sort="number">Monto</th>
+                    <th data-sort="text">Estado del pago</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for expense in expenses %}
+                <tr class="row-status-{{ expense.payment_status }}">
+
+                    <td data-value="{{ expense.concept }}">
+                        <a href="/expenses/edit/{{ expense.id }}" class="table-link">{{ expense.concept }}</a>
+                        <small class="table-note">
+                            {{ expense.frequency | frequency_label }}
+                        </small>
+                    </td>
+
+                    <td data-value="{{ expense.category }}">
+                        <span class="badge">{{ expense.category }}</span>
+                    </td>
+
+                    <td data-value="{{ expense.type | expense_type_label }}">
+                        {% if expense.type == "fixed" %}
+                        <span class="badge badge-fixed">Fijo</span>
+                        {% else %}
+                        <span class="badge badge-extra">Extraordinario</span>
+                        {% endif %}
+                    </td>
+
+                    <td class="text-right amount amount-negative" data-value="{{ expense.value }}">
+                        {{ expense.value | mxn }}
+                    </td>
+
+                    <td data-value="{{ expense.payment_status }}">
+                        <form method="post" action="/payments/status" class="payment-status">
+
+                            <input type="hidden" name="expense_id" value="{{ expense.id }}">
+                            <input type="hidden" name="month" value="{{ month }}">
+                            <input type="hidden" name="year" value="{{ year }}">
+
+                            {% for value, label in PAYMENT_STATUSES %}
+                            <button
+                                type="submit"
+                                name="status"
+                                value="{{ value }}"
+                                class="chip chip-{{ value }} {% if expense.payment_status == value %}is-active{% endif %}"
+                                title="{{ label }}"
+                                aria-pressed="{{ 'true' if expense.payment_status == value else 'false' }}"
+                            >
+                                {% if value == 'pending' %}⭕{% elif value == 'reserved' %}🏦{% else %}✅{% endif %}
+                                <span>{{ label }}</span>
+                            </button>
+                            {% endfor %}
+
+                        </form>
+                    </td>
+
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p>No hay gastos registrados para este mes.</p>
+    </div>
+    {% endif %}
+
+</section>
+
+
+<!-- =========================================================
+     INCOME OF THE MONTH
+     ========================================================= -->
+
+<section class="card">
+
+    <div class="card-header">
+        <div>
+            <h3>Ingresos de {{ month_name }}</h3>
+            <p>Detalle de todos los ingresos que aplican al mes</p>
+        </div>
+
+        <span class="record-count">
+            {{ income|length }} {% if income|length == 1 %}registro{% else %}registros{% endif %}
+        </span>
+    </div>
+
+    {% if income %}
+    <div class="table-container">
+        <table data-table="month-income">
+            <thead>
+                <tr>
+                    <th data-sort="text">Concepto</th>
+                    <th data-sort="text">Frecuencia</th>
+                    <th class="text-right" data-sort="number">Monto</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in income %}
+                <tr>
+                    <td data-value="{{ entry.concept }}">
+                        <a href="/income/edit/{{ entry.id }}" class="table-link">{{ entry.concept }}</a>
+                    </td>
+                    <td data-value="{{ entry.frequency | frequency_label }}">
+                        {{ entry.frequency | frequency_label }}
+                    </td>
+                    <td class="text-right amount amount-positive" data-value="{{ entry.value }}">
+                        {{ entry.value | mxn }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p>No hay ingresos registrados para este mes.</p>
+    </div>
+    {% endif %}
+
+</section>
+
+
+<!-- =========================================================
+     FINAL SUMMARY
+     ========================================================= -->
+
+<section class="final-summary">
+
+    <div>
+        <span>Ingresos</span>
+        <strong class="amount-positive">{{ total_income | mxn }}</strong>
+    </div>
+
+    <div>
+        <span>Gastos</span>
+        <strong class="amount-negative">{{ total_expenses | mxn }}</strong>
+    </div>
+
+    <div>
+        <span>Disponible</span>
+        <strong class="{% if available >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
+            {{ available | mxn }}
+        </strong>
+    </div>
+
+</section>
+
+{% endblock %}
+
+
+{% block scripts %}
+
+<!-- Chart data (read by static/dashboard.js) -->
+<script type="application/json" id="chart-data">{{ chart_data | tojson }}</script>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="/static/dashboard.js"></script>
+
+{% endblock %}

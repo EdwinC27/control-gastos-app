@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+
+{% block title %}Gastos{% endblock %}
+
+{% block content %}
+
+<header class="page-header">
+    <div>
+        <h1>Gastos</h1>
+        <p class="page-description">
+            Administra tus gastos fijos, extraordinarios y a plazos.
+        </p>
+    </div>
+</header>
+
+
+<!-- =========================================================
+     FORM
+     ========================================================= -->
+
+<section class="card">
+
+    <div class="card-header">
+        <div>
+            <h2>Agregar gasto</h2>
+            <p>Se incluirá automáticamente en tus cálculos mensuales.</p>
+        </div>
+    </div>
+
+    <form method="post" action="/expenses/add" class="form">
+
+        {{ m.error_list(errors) }}
+
+        {{ m.expense_fields(values, today) }}
+
+        <div class="form-actions">
+            <button type="submit" class="button button-primary">
+                + Agregar gasto
+            </button>
+        </div>
+
+    </form>
+
+</section>
+
+
+<!-- =========================================================
+     LIST
+     ========================================================= -->
+
+<section class="card">
+
+    <div class="card-header">
+        <div>
+            <h2>Gastos registrados</h2>
+            <p>
+                Los gastos inactivos aparecen al final y no se cuentan
+                en el dashboard. Haz clic en el título de una columna
+                para ordenar.
+            </p>
+        </div>
+    </div>
+
+    {% if expenses %}
+
+    {{ m.table_toolbar(
+        "expenses",
+        [
+            ("category", "Categoría", category_filters),
+            ("type", "Tipo", EXPENSE_TYPES),
+            ("status", "Estado", [("true", "Activos"), ("false", "Inactivos")]),
+            ("plan", "Plazos", [("yes", "A plazos"), ("no", "Sin plazos")])
+        ]
+    ) }}
+
+    <div class="table-container">
+        <table data-table="expenses">
+
+            <thead>
+                <tr>
+                    <th data-sort="text">Concepto</th>
+                    <th data-sort="text">Categoría</th>
+                    <th data-sort="text">Tipo</th>
+                    <th data-sort="text">Frecuencia</th>
+                    <th data-sort="date">Vigencia</th>
+                    <th data-sort="number">Plazos</th>
+                    <th data-sort="text">Estado</th>
+                    <th class="text-right" data-sort="number">Monto</th>
+                    <th class="text-center">Acciones</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for expense in expenses %}
+                <tr
+                    class="{% if expense.active != 'true' %}row-inactive{% endif %}"
+                    data-category="{{ expense.category }}"
+                    data-type="{{ expense.type }}"
+                    data-status="{{ expense.active }}"
+                    data-plan="{% if expense.plan %}yes{% else %}no{% endif %}"
+                    data-search="{{ expense.concept }} {{ expense.category }} {{ expense.type | expense_type_label }} {{ expense.notes }}"
+                >
+
+                    <td data-value="{{ expense.concept }}">
+                        <strong>{{ expense.concept }}</strong>
+                        {% if expense.notes %}
+                        <small class="table-note">{{ expense.notes }}</small>
+                        {% endif %}
+                    </td>
+
+                    <td data-value="{{ expense.category }}">
+                        <span class="badge">{{ expense.category }}</span>
+                    </td>
+
+                    <td data-value="{{ expense.type | expense_type_label }}">
+                        {% if expense.type == "fixed" %}
+                        <span class="badge badge-fixed">Fijo</span>
+                        {% else %}
+                        <span class="badge badge-extra">Extraordinario</span>
+                        {% endif %}
+                    </td>
+
+                    <td data-value="{{ expense.frequency | frequency_label }}">
+                        {{ expense.frequency | frequency_label }}
+                    </td>
+
+                    <td class="nowrap" data-value="{{ expense.start_date }}">
+                        {{ expense.start_date | date_mx }}
+                        {% if expense.end_date %}
+                        <small class="table-note">hasta {{ expense.end_date | date_mx }}</small>
+                        {% endif %}
+                    </td>
+
+                    <td data-value="{% if expense.plan %}{{ expense.plan.remaining }}{% else %}-1{% endif %}">
+                        {% if expense.plan %}
+                            {% if expense.plan.finished %}
+                            <span class="badge badge-success">Liquidado</span>
+                            {% else %}
+                            <span class="nowrap">
+                                {{ expense.plan.paid }}/{{ expense.plan.installments }}
+                            </span>
+                            <small class="table-note">
+                                faltan {{ expense.plan.remaining }} · {{ expense.plan.balance | mxn }}
+                            </small>
+                            {% endif %}
+                        {% else %}
+                        <span class="text-light">—</span>
+                        {% endif %}
+                    </td>
+
+                    <td data-value="{% if expense.active == 'true' %}0{% else %}1{% endif %}">
+                        {% if expense.active == "true" %}
+                        <span class="badge badge-success">Activo</span>
+                        {% else %}
+                        <span class="badge badge-neutral">Inactivo</span>
+                        {% endif %}
+                    </td>
+
+                    <td class="text-right amount" data-value="{{ expense.amount }}">
+                        {{ expense.amount | mxn }}
+                    </td>
+
+                    <td class="col-actions">
+                        {{ m.row_actions("expenses", expense) }}
+                    </td>
+
+                </tr>
+                {% endfor %}
+            </tbody>
+
+        </table>
+    </div>
+
+    <div class="empty-state" data-table-empty="expenses" hidden>
+        <div class="empty-state-icon">🔎</div>
+        <h3>Ningún gasto coincide con el filtro</h3>
+        <p>Cambia la búsqueda o pulsa «Limpiar».</p>
+    </div>
+
+    {% else %}
+
+    <div class="empty-state">
+        <div class="empty-state-icon">🧾</div>
+        <h3>Todavía no tienes gastos registrados</h3>
+        <p>Usa el formulario de arriba para agregar el primero.</p>
+    </div>
+
+    {% endif %}
+
+</section>
+
+
+{{ m.frequency_help("gasto") }}
+
+{% endblock %}

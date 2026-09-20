@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+
+{% block title %}Editar gasto{% endblock %}
+
+{% block content %}
+
+{# On validation errors the values typed by the user are shown again #}
+{% set v = values if values else expense %}
+
+<header class="page-header">
+    <div>
+        <h1>Editar gasto</h1>
+        <p class="page-description">
+            Modifica la información del gasto seleccionado.
+        </p>
+    </div>
+</header>
+
+
+<section class="card">
+
+    <form method="post" action="/expenses/edit/{{ expense.id }}" class="form">
+
+        {{ m.error_list(errors) }}
+
+        {{ m.expense_fields(v, "", true) }}
+
+        <div class="form-actions">
+            <button type="submit" class="button button-primary">
+                Guardar cambios
+            </button>
+
+            <a href="/expenses" class="button button-secondary">
+                Cancelar
+            </a>
+        </div>
+
+    </form>
+
+</section>
+
+
+{% if plan %}
+<section class="card">
+
+    <div class="card-header">
+        <div>
+            <h3>Plan de pagos</h3>
+            <p>Calculado con el número de pagos y la fecha del primer pago</p>
+        </div>
+
+        <strong class="card-header-value {% if not plan.finished %}amount-negative{% endif %}">
+            {{ plan.balance | mxn }}
+        </strong>
+    </div>
+
+    <div class="card-body">
+
+        <div class="summary-grid summary-grid-3">
+
+            <div class="summary-card">
+                <div class="summary-card-label">Avance</div>
+                <div class="summary-card-value">{{ plan.paid }} / {{ plan.installments }}</div>
+                <div class="summary-card-description">pagos realizados</div>
+            </div>
+
+            <div class="summary-card">
+                <div class="summary-card-label">Te faltan</div>
+                <div class="summary-card-value">{{ plan.remaining }}</div>
+                <div class="summary-card-description">
+                    {% if plan.finished %}
+                        Ya está liquidado
+                    {% else %}
+                        Último pago: {{ plan.end_date | month_year }}
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="summary-card">
+                <div class="summary-card-label">Costo total</div>
+                <div class="summary-card-value">{{ plan.total | mxn }}</div>
+                <div class="summary-card-description">
+                    {{ plan.amount | mxn }} x {{ plan.installments }} pagos
+                </div>
+            </div>
+
+        </div>
+
+        <div class="progress-track">
+            <div
+                class="progress-bar {% if plan.finished %}progress-bar--ok{% endif %}"
+                style="width: {{ '%.1f'|format(plan.percent) }}%;"
+            ></div>
+        </div>
+
+    </div>
+
+</section>
+{% endif %}
+
+
+<section class="information-card information-note">
+    <strong>💡 Editando el gasto #{{ expense.id }}</strong>
+    <p>
+        Los cambios se guardan directamente en <code>data/gastos.csv</code>.
+        Si marcas el gasto como inactivo, dejará de contarse en el dashboard.
+    </p>
+</section>
+
+{% endblock %}
