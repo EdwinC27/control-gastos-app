@@ -84,11 +84,17 @@ En el dashboard, la tabla **Gastos del mes** tiene tres botones por renglón:
 | Botón | Significa |
 |---|---|
 | ⭕ Falta por juntar | todavía no tienes ese dinero |
-| 🏦 Apartado | ya lo separaste, pero no lo has pagado |
+| 🏦 Apartado | ya lo separaste completo, pero no lo has pagado |
 | ✅ Pagado | ya salió |
 
-Arriba, la tarjeta **Pagos del mes** suma las tres columnas y te dice cuánto
-**falta por juntar**. También hay atajos para *marcar todo como pagado* o
+Y en la columna **Ya juntado** registras abonos: si un gasto es de $12,000 y
+esta quincena juntaste $1,000, escribes `1000` y pulsas **+**. La fila te
+muestra `$1,000.00 · falta $11,000.00` con su barra de avance. Puedes abonar
+las veces que quieras, corregir con un número negativo o borrar lo juntado con
+**✕**. Cuando los abonos completan el monto, el gasto pasa solo a **Apartado**.
+
+Arriba, la tarjeta **Pagos del mes** suma las cuatro columnas —pagado,
+apartado, abonado y lo que **falta por juntar**—. También hay atajos para *marcar todo como pagado* o
 *reiniciar el mes*.
 
 Esto no cambia los totales del dashboard: los gastos siguen contando completos.
@@ -147,7 +153,7 @@ data/
 ├── gastos.csv        tus gastos
 ├── ingresos.csv      tus ingresos
 ├── categorias.csv    el catálogo de categorías
-├── pagos.csv         qué marcaste como pagado/apartado, por mes
+├── pagos.csv         estado y abonos de cada gasto, por mes
 └── backups/          respaldo automático diario (últimos 30 días)
 ```
 
