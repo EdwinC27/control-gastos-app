@@ -25,6 +25,7 @@ from common import (
     installment_info,
     is_active,
     normalize_expense_type,
+    payment_entries,
     payment_statuses,
     period_key,
     read_csv,
@@ -163,14 +164,22 @@ def financial_status(total_income, total_expenses, available_percent):
 
 
 def payment_summary(month_expenses):
-    """Totals of the monthly 'planned vs. real' checklist."""
+    """
+    Totals of the monthly "planned vs. real" checklist.
+
+    An expense already paid or reserved counts in full. A pending one
+    counts twice: what has been gathered so far (its abonos) and what
+    is still missing.
+    """
 
     summary = {
         "paid": 0.0,
         "reserved": 0.0,
+        "saved": 0.0,
         "pending": 0.0,
         "n_paid": 0,
         "n_reserved": 0,
+        "n_saved": 0,
         "n_pending": 0,
     }
 
@@ -178,10 +187,26 @@ def payment_summary(month_expenses):
 
         status = expense.get("payment_status", "pending")
 
-        summary[status] += expense["value"]
-        summary["n_" + status] += 1
+        if status == "paid":
+            summary["paid"] += expense["value"]
+            summary["n_paid"] += 1
 
-    summary["covered"] = summary["paid"] + summary["reserved"]
+        elif status == "reserved":
+            summary["reserved"] += expense["value"]
+            summary["n_reserved"] += 1
+
+        else:
+            summary["saved"] += expense["saved"]
+            summary["pending"] += expense["remaining"]
+            summary["n_pending"] += 1
+
+            if expense["saved"] > 0:
+                summary["n_saved"] += 1
+
+    summary["covered"] = (
+        summary["paid"] + summary["reserved"] + summary["saved"]
+    )
+
     summary["total"] = summary["covered"] + summary["pending"]
 
     summary["covered_percent"] = (
@@ -285,14 +310,27 @@ async def dashboard(
     month_expenses = entries_of_month(all_expenses, month, year)
     month_income = entries_of_month(all_income, month, year)
 
-    # ---- payment status of every expense of the month ------------
+    # ---- payment status and abonos of every expense of the month -
     period = period_key(month, year)
-    statuses = payment_statuses(period)
+    entries = payment_entries(period)
 
     for expense in month_expenses:
-        expense["payment_status"] = statuses.get(
-            str(expense.get("id", "")),
-            "pending"
+
+        entry = entries.get(str(expense.get("id", "")), {})
+
+        status = entry.get("status", "pending")
+        saved = min(entry.get("saved", 0.0), expense["value"])
+
+        expense["payment_status"] = status
+        expense["saved"] = saved if status == "pending" else expense["value"]
+
+        expense["remaining"] = (
+            max(0.0, expense["value"] - saved) if status == "pending" else 0.0
+        )
+
+        expense["saved_percent"] = (
+            expense["saved"] / expense["value"] * 100
+            if expense["value"] > 0 else 0.0
         )
 
     month_expenses.sort(key=lambda e: e["value"], reverse=True)

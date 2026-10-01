@@ -73,6 +73,7 @@ PAYMENT_FIELDS = [
     "expense_id",
     "period",
     "status",
+    "saved",
     "updated",
 ]
 
@@ -779,10 +780,15 @@ def write_payments(payments):
     write_csv(PAYMENTS_FILE, PAYMENT_FIELDS, payments)
 
 
-def payment_statuses(period):
-    """{'6': 'paid', '9': 'reserved', ...} for one month."""
+def payment_entries(period):
+    """
+    {'6': {'status': 'paid', 'saved': 0.0}, ...} for one month.
 
-    statuses = {}
+    'saved' is how much has been put aside for that expense so far
+    (partial payments, "abonos").
+    """
+
+    entries = {}
 
     for payment in read_payments():
 
@@ -794,42 +800,118 @@ def payment_statuses(period):
         if not expense_id:
             continue
 
-        statuses[expense_id] = normalize_payment_status(payment.get("status"))
+        entries[expense_id] = {
+            "status": normalize_payment_status(payment.get("status")),
+            "saved": max(0.0, to_amount(payment.get("saved"))),
+        }
 
-    return statuses
+    return entries
 
 
-def save_payment_status(expense_id, period, status):
+def payment_statuses(period):
+    """{'6': 'paid', '9': 'reserved', ...} for one month."""
+
+    return {
+        expense_id: entry["status"]
+        for expense_id, entry in payment_entries(period).items()
+    }
+
+
+def _update_payment(expense_id, period, status=None, saved=None):
     """
-    Save (or clear) the payment status of an expense in one month.
+    Create or update the payment row of an expense in one month.
 
-    'pending' is the default, so instead of storing it the row is
-    removed and the file does not grow for nothing.
+    A row holding nothing worth remembering (pending and no money put
+    aside) is dropped instead of stored, so the file does not grow for
+    nothing.
+
+    Returns the resulting row as a dict.
     """
 
     expense_id = str(expense_id).strip()
-    status = normalize_payment_status(status)
 
-    payments = [
-        payment
-        for payment in read_payments()
-        if not (
+    current = {"status": "pending", "saved": 0.0}
+    rest = []
+
+    for payment in read_payments():
+
+        same = (
             (payment.get("expense_id") or "").strip() == expense_id
             and (payment.get("period") or "").strip() == period
         )
-    ]
 
-    if status != "pending":
-        payments.append(
+        if same:
+            current = {
+                "status": normalize_payment_status(payment.get("status")),
+                "saved": max(0.0, to_amount(payment.get("saved"))),
+            }
+        else:
+            rest.append(payment)
+
+    if status is not None:
+        current["status"] = normalize_payment_status(status)
+
+    if saved is not None:
+        current["saved"] = max(0.0, to_amount(saved))
+
+    if current["status"] != "pending" or current["saved"] > 0:
+        rest.append(
             {
                 "expense_id": expense_id,
                 "period": period,
-                "status": status,
+                "status": current["status"],
+                "saved": f"{current['saved']:.2f}" if current["saved"] else "",
                 "updated": date.today().isoformat(),
             }
         )
 
-    write_payments(payments)
+    write_payments(rest)
+
+    return current
+
+
+def set_payment_status(expense_id, period, status):
+    """Mark an expense as pending, reserved or paid, keeping its abonos."""
+
+    return _update_payment(expense_id, period, status=status)
+
+
+def set_payment_saved(expense_id, period, saved, limit=None):
+    """
+    Set how much has been put aside for an expense this month.
+
+    The amount is clamped between 0 and 'limit' (the expense amount),
+    and once the whole amount is gathered the expense is marked as
+    reserved on its own.
+    """
+
+    saved = max(0.0, to_amount(saved))
+
+    if limit is not None and limit > 0:
+        saved = min(saved, limit)
+
+    status = None
+
+    if limit is not None and limit > 0 and saved >= limit:
+        status = "reserved"
+
+    return _update_payment(expense_id, period, status=status, saved=saved)
+
+
+def add_payment_saved(expense_id, period, amount, limit=None):
+    """
+    Add an abono to what is already put aside (a negative amount
+    corrects a mistake). Returns the resulting row.
+    """
+
+    current = payment_entries(period).get(str(expense_id).strip(), {})
+
+    return set_payment_saved(
+        expense_id,
+        period,
+        current.get("saved", 0.0) + to_amount(amount),
+        limit
+    )
 
 
 def clear_payments(expense_id):
