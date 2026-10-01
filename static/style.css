@@ -1707,3 +1707,47 @@ input.is-calculated {
     }
 
 }
+
+
+/* ---- abonos (partial savings) ---------------------------- */
+
+.saved-cell {
+    min-width: 180px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.saved-figures {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.saved-figures .table-note {
+    margin: 0;
+}
+
+.saved-form {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.saved-input {
+    width: 92px;
+    padding: 6px 8px;
+    border: 1px solid var(--input-border);
+    border-radius: var(--radius);
+    background: var(--input-bg);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.85rem;
+}
+
+.saved-input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-light);
+}

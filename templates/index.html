@@ -170,7 +170,7 @@
     <div class="card-header">
         <div>
             <h3>Pagos de {{ month_name }}</h3>
-            <p>Lo que ya saliste a pagar, lo que tienes apartado y lo que falta por juntar</p>
+            <p>Lo que ya pagaste, lo que tienes apartado, lo que llevas abonado y lo que falta por juntar</p>
         </div>
 
         <strong class="card-header-value {% if payments.pending > 0 %}amount-negative{% else %}amount-positive{% endif %}">
@@ -184,7 +184,7 @@
 
     <div class="card-body">
 
-        <div class="summary-grid summary-grid-3">
+        <div class="summary-grid">
 
             <div class="summary-card">
                 <div class="summary-card-label">Pagado</div>
@@ -201,11 +201,19 @@
             </div>
 
             <div class="summary-card">
+                <div class="summary-card-label">Abonado</div>
+                <div class="summary-card-value">{{ payments.saved | mxn }}</div>
+                <div class="summary-card-description">
+                    Juntado a cuenta de {{ payments.n_saved }} gasto(s)
+                </div>
+            </div>
+
+            <div class="summary-card">
                 <div class="summary-card-label">Falta por juntar</div>
                 <div class="summary-card-value {% if payments.pending > 0 %}amount-negative{% endif %}">
                     {{ payments.pending | mxn }}
                 </div>
-                <div class="summary-card-description">{{ payments.n_pending }} gasto(s)</div>
+                <div class="summary-card-description">{{ payments.n_pending }} gasto(s) sin cubrir</div>
             </div>
 
         </div>
@@ -587,6 +595,7 @@
                     <th data-sort="text">Categoría</th>
                     <th data-sort="text">Tipo</th>
                     <th class="text-right" data-sort="number">Monto</th>
+                    <th data-sort="number">Ya juntado</th>
                     <th data-sort="text">Estado del pago</th>
                 </tr>
             </thead>
@@ -615,6 +624,65 @@
 
                     <td class="text-right amount amount-negative" data-value="{{ expense.value }}">
                         {{ expense.value | mxn }}
+                    </td>
+
+                    <td data-value="{{ expense.saved }}">
+                        {% if expense.payment_status == "pending" %}
+                        <div class="saved-cell">
+
+                            <div class="saved-figures">
+                                <strong>{{ expense.saved | mxn }}</strong>
+                                <small class="table-note">
+                                    falta {{ expense.remaining | mxn }}
+                                </small>
+                            </div>
+
+                            <div class="progress-track progress-track-sm">
+                                <div
+                                    class="progress-bar"
+                                    style="width: {{ '%.1f'|format(expense.saved_percent) }}%;"
+                                ></div>
+                            </div>
+
+                            <form method="post" action="/payments/saved" class="saved-form">
+
+                                <input type="hidden" name="expense_id" value="{{ expense.id }}">
+                                <input type="hidden" name="month" value="{{ month }}">
+                                <input type="hidden" name="year" value="{{ year }}">
+
+                                <input
+                                    type="number"
+                                    name="amount"
+                                    step="0.01"
+                                    class="saved-input"
+                                    placeholder="Abono"
+                                    aria-label="Abonar a {{ expense.concept }}"
+                                >
+
+                                <button
+                                    type="submit"
+                                    name="action"
+                                    value="add"
+                                    class="button button-secondary button-sm"
+                                    title="Sumar este abono a lo que llevas juntado"
+                                >+</button>
+
+                                {% if expense.saved > 0 %}
+                                <button
+                                    type="submit"
+                                    name="action"
+                                    value="reset"
+                                    class="button button-ghost button-sm"
+                                    title="Borrar lo juntado"
+                                >✕</button>
+                                {% endif %}
+
+                            </form>
+
+                        </div>
+                        {% else %}
+                        <span class="badge badge-success">Completo</span>
+                        {% endif %}
                     </td>
 
                     <td data-value="{{ expense.payment_status }}">
