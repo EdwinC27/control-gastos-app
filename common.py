@@ -41,6 +41,7 @@ for _folder in (DATA_DIR, TEMPLATES_DIR, STATIC_DIR):
 EXPENSES_FILE = DATA_DIR / "gastos.csv"
 INCOME_FILE = DATA_DIR / "ingresos.csv"
 PAYMENTS_FILE = DATA_DIR / "pagos.csv"
+DEPOSITS_FILE = DATA_DIR / "abonos.csv"
 CATEGORIES_FILE = DATA_DIR / "categorias.csv"
 
 EXPENSE_FIELDS = [
@@ -73,8 +74,18 @@ PAYMENT_FIELDS = [
     "expense_id",
     "period",
     "status",
-    "saved",
     "updated",
+]
+
+# Every abono: money put aside for one expense in one month, with its
+# own note and timestamp. The total saved is the sum of these rows.
+DEPOSIT_FIELDS = [
+    "id",
+    "expense_id",
+    "period",
+    "amount",
+    "note",
+    "created_at",
 ]
 
 CATEGORY_FIELDS = [
@@ -395,10 +406,18 @@ def ensure_files():
     for path, fields in (
         (EXPENSES_FILE, EXPENSE_FIELDS),
         (INCOME_FILE, INCOME_FIELDS),
-        (PAYMENTS_FILE, PAYMENT_FIELDS),
+        (DEPOSITS_FILE, DEPOSIT_FIELDS),
     ):
         _create_if_missing(path, fields)
         _migrate(path, fields)
+
+    _create_if_missing(PAYMENTS_FILE, PAYMENT_FIELDS)
+
+    # Older versions kept the total saved in a 'saved' column. Each one
+    # becomes an abono so no money already gathered is lost.
+    _migrate_saved_column()
+
+    _migrate(PAYMENTS_FILE, PAYMENT_FIELDS)
 
     ensure_categories()
 
@@ -802,8 +821,17 @@ def payment_entries(period):
 
         entries[expense_id] = {
             "status": normalize_payment_status(payment.get("status")),
-            "saved": max(0.0, to_amount(payment.get("saved"))),
+            "saved": 0.0,
         }
+
+    for expense_id, total in deposit_totals(period).items():
+
+        entry = entries.setdefault(
+            expense_id,
+            {"status": "pending", "saved": 0.0}
+        )
+
+        entry["saved"] = total
 
     return entries
 
@@ -817,20 +845,18 @@ def payment_statuses(period):
     }
 
 
-def _update_payment(expense_id, period, status=None, saved=None):
+def _update_payment(expense_id, period, status=None):
     """
     Create or update the payment row of an expense in one month.
 
-    A row holding nothing worth remembering (pending and no money put
-    aside) is dropped instead of stored, so the file does not grow for
-    nothing.
-
-    Returns the resulting row as a dict.
+    A row that says nothing (pending) is dropped instead of stored, so
+    the file does not grow for nothing. The abonos live in their own
+    file and are never touched here.
     """
 
     expense_id = str(expense_id).strip()
 
-    current = {"status": "pending", "saved": 0.0}
+    current = "pending"
     rest = []
 
     for payment in read_payments():
@@ -841,26 +867,19 @@ def _update_payment(expense_id, period, status=None, saved=None):
         )
 
         if same:
-            current = {
-                "status": normalize_payment_status(payment.get("status")),
-                "saved": max(0.0, to_amount(payment.get("saved"))),
-            }
+            current = normalize_payment_status(payment.get("status"))
         else:
             rest.append(payment)
 
     if status is not None:
-        current["status"] = normalize_payment_status(status)
+        current = normalize_payment_status(status)
 
-    if saved is not None:
-        current["saved"] = max(0.0, to_amount(saved))
-
-    if current["status"] != "pending" or current["saved"] > 0:
+    if current != "pending":
         rest.append(
             {
                 "expense_id": expense_id,
                 "period": period,
-                "status": current["status"],
-                "saved": f"{current['saved']:.2f}" if current["saved"] else "",
+                "status": current,
                 "updated": date.today().isoformat(),
             }
         )
@@ -876,46 +895,215 @@ def set_payment_status(expense_id, period, status):
     return _update_payment(expense_id, period, status=status)
 
 
-def set_payment_saved(expense_id, period, saved, limit=None):
+# ============================================================
+# ABONOS (money put aside little by little, with notes)
+# ============================================================
+
+def read_deposits():
+    return read_csv(DEPOSITS_FILE)
+
+
+def write_deposits(deposits):
+    write_csv(DEPOSITS_FILE, DEPOSIT_FIELDS, deposits)
+
+
+def deposits_of(period, expense_id=None):
     """
-    Set how much has been put aside for an expense this month.
+    Abonos of one month, newest first.
 
-    The amount is clamped between 0 and 'limit' (the expense amount),
-    and once the whole amount is gathered the expense is marked as
-    reserved on its own.
-    """
-
-    saved = max(0.0, to_amount(saved))
-
-    if limit is not None and limit > 0:
-        saved = min(saved, limit)
-
-    status = None
-
-    if limit is not None and limit > 0 and saved >= limit:
-        status = "reserved"
-
-    return _update_payment(expense_id, period, status=status, saved=saved)
-
-
-def add_payment_saved(expense_id, period, amount, limit=None):
-    """
-    Add an abono to what is already put aside (a negative amount
-    corrects a mistake). Returns the resulting row.
+    With 'expense_id' only that expense's abonos are returned.
     """
 
-    current = payment_entries(period).get(str(expense_id).strip(), {})
+    period = (period or "").strip()
+    wanted = str(expense_id).strip() if expense_id is not None else None
 
-    return set_payment_saved(
-        expense_id,
-        period,
-        current.get("saved", 0.0) + to_amount(amount),
-        limit
+    found = []
+
+    for deposit in read_deposits():
+
+        if (deposit.get("period") or "").strip() != period:
+            continue
+
+        if wanted is not None:
+            if (deposit.get("expense_id") or "").strip() != wanted:
+                continue
+
+        found.append(
+            {
+                "id": (deposit.get("id") or "").strip(),
+                "expense_id": (deposit.get("expense_id") or "").strip(),
+                "period": period,
+                "amount": to_amount(deposit.get("amount")),
+                "note": (deposit.get("note") or "").strip(),
+                "created_at": (deposit.get("created_at") or "").strip(),
+            }
+        )
+
+    found.sort(key=lambda d: (d["created_at"], d["id"]), reverse=True)
+
+    return found
+
+
+def deposits_by_expense(period):
+    """{'12': [abono, abono, ...], ...} for one month, newest first."""
+
+    grouped = {}
+
+    for deposit in deposits_of(period):
+        grouped.setdefault(deposit["expense_id"], []).append(deposit)
+
+    return grouped
+
+
+def deposit_totals(period):
+    """{'12': 6039.0, ...} with how much is saved for each expense."""
+
+    totals = {}
+
+    for deposit in deposits_of(period):
+
+        totals[deposit["expense_id"]] = (
+            totals.get(deposit["expense_id"], 0.0) + deposit["amount"]
+        )
+
+    return totals
+
+
+def add_deposit(expense_id, period, amount, note="", limit=None):
+    """
+    Register an abono (a negative amount corrects a mistake) and stamp
+    it with the current date and time.
+
+    When the abonos add up to the whole amount of the expense, it is
+    marked as reserved on its own. Returns the new total saved.
+    """
+
+    expense_id = str(expense_id).strip()
+    amount = to_amount(amount)
+
+    deposits = read_deposits()
+
+    deposits.append(
+        {
+            "id": next_id(deposits),
+            "expense_id": expense_id,
+            "period": period,
+            "amount": f"{amount:.2f}",
+            "note": (note or "").strip()[:200],
+            "created_at": datetime.now().isoformat(timespec="seconds"),
+        }
+    )
+
+    write_deposits(deposits)
+
+    total = deposit_totals(period).get(expense_id, 0.0)
+
+    if limit is not None and limit > 0 and total >= limit:
+        set_payment_status(expense_id, period, "reserved")
+
+    return total
+
+
+def delete_deposit(deposit_id):
+    """Remove one abono."""
+
+    deposit_id = str(deposit_id).strip()
+
+    write_deposits(
+        [
+            deposit
+            for deposit in read_deposits()
+            if (deposit.get("id") or "").strip() != deposit_id
+        ]
     )
 
 
+def clear_deposits(expense_id, period=None):
+    """Remove every abono of an expense (optionally, of one month)."""
+
+    expense_id = str(expense_id).strip()
+    period = (period or "").strip()
+
+    kept = []
+
+    for deposit in read_deposits():
+
+        same_expense = (deposit.get("expense_id") or "").strip() == expense_id
+        same_period = (
+            not period
+            or (deposit.get("period") or "").strip() == period
+        )
+
+        if same_expense and same_period:
+            continue
+
+        kept.append(deposit)
+
+    write_deposits(kept)
+
+
+def _migrate_saved_column():
+    """
+    Turn the old 'saved' column of pagos.csv into abonos, so the money
+    already gathered survives the upgrade.
+    """
+
+    if not PAYMENTS_FILE.exists():
+        return
+
+    with open(PAYMENTS_FILE, "r", encoding="utf-8-sig", newline="") as handle:
+        header = [(c or "").strip() for c in next(csv.reader(handle), [])]
+
+    if "saved" not in header:
+        return
+
+    deposits = read_deposits()
+
+    known = {
+        (
+            (deposit.get("expense_id") or "").strip(),
+            (deposit.get("period") or "").strip(),
+        )
+        for deposit in deposits
+    }
+
+    added = False
+
+    for payment in read_csv(PAYMENTS_FILE):
+
+        saved = to_amount(payment.get("saved"))
+
+        if saved <= 0:
+            continue
+
+        expense_id = (payment.get("expense_id") or "").strip()
+        period = (payment.get("period") or "").strip()
+
+        if (expense_id, period) in known:
+            continue
+
+        deposits.append(
+            {
+                "id": next_id(deposits),
+                "expense_id": expense_id,
+                "period": period,
+                "amount": f"{saved:.2f}",
+                "note": "Abono registrado antes de las notas",
+                "created_at": (
+                    (payment.get("updated") or "").strip()
+                    or date.today().isoformat()
+                ),
+            }
+        )
+
+        added = True
+
+    if added:
+        write_deposits(deposits)
+
+
 def clear_payments(expense_id):
-    """Drop the payment history of a deleted expense."""
+    """Drop the payment history and the abonos of a deleted expense."""
 
     expense_id = str(expense_id).strip()
 
@@ -926,6 +1114,8 @@ def clear_payments(expense_id):
     ]
 
     write_payments(payments)
+
+    clear_deposits(expense_id)
 
 
 # ============================================================
@@ -1151,6 +1341,28 @@ def date_mx(value):
     return moment.strftime("%d/%m/%Y")
 
 
+def datetime_mx(value):
+    """
+    2026-10-04T14:32:00 -> 04/10/2026 14:32
+    2026-10-03          -> 03/10/2026
+    """
+
+    text = (value or "").strip()
+
+    if not text:
+        return ""
+
+    try:
+        moment = datetime.fromisoformat(text)
+    except ValueError:
+        return date_mx(text)
+
+    if "T" not in text:
+        return moment.strftime("%d/%m/%Y")
+
+    return moment.strftime("%d/%m/%Y %H:%M")
+
+
 def month_year(value):
     """2027-03-01 -> Marzo 2027"""
 
@@ -1197,6 +1409,7 @@ templates.env.filters.update(
         "mxn": money_mxn,
         "pct": percent,
         "date_mx": date_mx,
+        "datetime_mx": datetime_mx,
         "month_year": month_year,
         "frequency_label": frequency_label,
         "expense_type_label": expense_type_label,

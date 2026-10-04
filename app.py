@@ -21,6 +21,7 @@ from common import (
     MONTH_NAMES,
     STATIC_DIR,
     applies_to_month,
+    deposits_by_expense,
     ensure_files,
     installment_info,
     is_active,
@@ -313,13 +314,18 @@ async def dashboard(
     # ---- payment status and abonos of every expense of the month -
     period = period_key(month, year)
     entries = payment_entries(period)
+    deposits = deposits_by_expense(period)
 
     for expense in month_expenses:
 
-        entry = entries.get(str(expense.get("id", "")), {})
+        expense_id = str(expense.get("id", ""))
+
+        entry = entries.get(expense_id, {})
 
         status = entry.get("status", "pending")
-        saved = min(entry.get("saved", 0.0), expense["value"])
+        saved = min(max(0.0, entry.get("saved", 0.0)), expense["value"])
+
+        expense["deposits"] = deposits.get(expense_id, [])
 
         expense["payment_status"] = status
         expense["saved"] = saved if status == "pending" else expense["value"]

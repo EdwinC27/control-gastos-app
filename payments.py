@@ -2,11 +2,12 @@
 payments.py
 
 Track every expense of the month: mark it as pending, reserved or
-paid, and record the abonos (partial amounts already put aside).
+paid, and register the abonos (partial amounts already put aside),
+each one with its own note and timestamp.
 
-Both live in data/pagos.csv and change no total: they only tell you
-what already went out, what you have gathered and how much is still
-missing.
+The status lives in data/pagos.csv and the abonos in data/abonos.csv.
+Neither changes any total: they only tell you what already went out,
+what you have gathered and how much is still missing.
 """
 
 from fastapi import APIRouter, Form
@@ -16,12 +17,13 @@ from common import (
     EXPENSES_FILE,
     MAX_YEAR,
     MIN_YEAR,
-    add_payment_saved,
+    add_deposit,
     applies_to_month,
+    clear_deposits,
+    delete_deposit,
     normalize_payment_status,
     period_key,
     read_csv,
-    set_payment_saved,
     set_payment_status,
     to_amount,
 )
@@ -63,7 +65,7 @@ def _expense_amount(expense_id, month, year):
 
 
 # ============================================================
-# ONE EXPENSE
+# STATUS OF ONE EXPENSE
 # ============================================================
 
 @router.post("/status")
@@ -90,13 +92,14 @@ async def set_status(
 
 
 # ============================================================
-# ABONOS (money put aside little by little)
+# ABONOS
 # ============================================================
 
 @router.post("/saved")
-async def save_abono(
+async def register_deposit(
     expense_id: str = Form(""),
     amount: str = Form(""),
+    note: str = Form(""),
     action: str = Form("add"),
     month: int = Form(0),
     year: int = Form(0)
@@ -111,19 +114,39 @@ async def save_abono(
         return _back_to_dashboard(month, year)
 
     period = period_key(month, year)
-    limit = _expense_amount(expense_id, month, year)
 
     if action == "reset":
-        set_payment_saved(expense_id, period, 0, None)
-
-    elif action == "full" and limit:
-        set_payment_saved(expense_id, period, limit, limit)
+        clear_deposits(expense_id, period)
 
     else:
         amount = to_amount((amount or "").replace("$", "").replace(",", ""))
 
         if amount:
-            add_payment_saved(expense_id, period, amount, limit)
+            add_deposit(
+                expense_id,
+                period,
+                amount,
+                note,
+                _expense_amount(expense_id, month, year)
+            )
+
+    return _back_to_dashboard(month, year)
+
+
+@router.post("/saved/delete")
+async def remove_deposit(
+    deposit_id: str = Form(""),
+    month: int = Form(0),
+    year: int = Form(0)
+):
+
+    if not _valid_period(month, year):
+        return RedirectResponse(url="/", status_code=303)
+
+    deposit_id = (deposit_id or "").strip()
+
+    if deposit_id:
+        delete_deposit(deposit_id)
 
     return _back_to_dashboard(month, year)
 
@@ -156,6 +179,6 @@ async def set_all_statuses(
 
         # Starting the month over also clears the abonos.
         if status == "pending":
-            set_payment_saved(expense_id, period, 0, None)
+            clear_deposits(expense_id, period)
 
     return _back_to_dashboard(month, year)
