@@ -4,6 +4,118 @@
 
 {% block content %}
 
+{# ------------------------------------------------------------
+   Formulario para registrar un abono o un uso
+   ------------------------------------------------------------ #}
+{% macro movement_form(expense, kind, amount_label, note_label) %}
+<form method="post" action="/payments/movement" class="saved-form">
+
+    <input type="hidden" name="expense_id" value="{{ expense.id }}">
+    <input type="hidden" name="month" value="{{ month }}">
+    <input type="hidden" name="year" value="{{ year }}">
+    <input type="hidden" name="kind" value="{{ kind }}">
+
+    <input
+        type="number"
+        name="amount"
+        step="0.01"
+        class="saved-input"
+        placeholder="{{ amount_label }}"
+        aria-label="{{ amount_label }} de {{ expense.concept }}"
+    >
+
+    <input
+        type="text"
+        name="note"
+        class="saved-note"
+        maxlength="200"
+        placeholder="{{ note_label }}"
+        aria-label="Nota del movimiento de {{ expense.concept }}"
+    >
+
+    <button
+        type="submit"
+        class="button button-secondary button-sm"
+        title="{% if kind == 'spend' %}Registrar un uso de este dinero{% else %}Registrar este abono{% endif %}"
+    >+</button>
+
+</form>
+{% endmacro %}
+
+
+{# ------------------------------------------------------------
+   Historial de abonos y usos de un gasto en el mes
+   ------------------------------------------------------------ #}
+{% macro movement_log(expense) %}
+{% if expense.movements %}
+<details class="deposit-log">
+
+    <summary>
+        {{ expense.movements|length }}
+        {% if expense.movements|length == 1 %}movimiento{% else %}movimientos{% endif %}
+    </summary>
+
+    <ul class="deposit-list">
+        {% for movement in expense.movements %}
+        <li>
+
+            <div class="deposit-head">
+                <span class="movement-kind movement-kind--{{ movement.kind }}">
+                    {{ movement.label }}
+                </span>
+
+                <strong class="{% if movement.amount < 0 %}amount-negative{% endif %}">
+                    {{ movement.amount | mxn }}
+                </strong>
+
+                <time datetime="{{ movement.created_at }}">
+                    {{ movement.created_at | datetime_mx }}
+                </time>
+
+                <form
+                    method="post"
+                    action="/payments/movement/delete"
+                    data-confirm="¿Borrar el movimiento de {{ movement.amount | mxn }} del {{ movement.created_at | datetime_mx }}?"
+                >
+                    <input type="hidden" name="movement_id" value="{{ movement.id }}">
+                    <input type="hidden" name="month" value="{{ month }}">
+                    <input type="hidden" name="year" value="{{ year }}">
+                    <button
+                        type="submit"
+                        class="deposit-delete"
+                        title="Borrar este movimiento"
+                        aria-label="Borrar el movimiento de {{ movement.amount | mxn }}"
+                    >✕</button>
+                </form>
+            </div>
+
+            {% if movement.note %}
+            <p class="deposit-note">{{ movement.note }}</p>
+            {% endif %}
+
+        </li>
+        {% endfor %}
+    </ul>
+
+    <form
+        method="post"
+        action="/payments/movement/clear"
+        class="deposit-clear"
+        data-confirm="¿Borrar los {{ expense.movements|length }} movimiento(s) de «{{ expense.concept }}» de {{ month_name }}?"
+    >
+        <input type="hidden" name="expense_id" value="{{ expense.id }}">
+        <input type="hidden" name="month" value="{{ month }}">
+        <input type="hidden" name="year" value="{{ year }}">
+        <button type="submit" class="button button-ghost button-sm">
+            Borrar todo el historial
+        </button>
+    </form>
+
+</details>
+{% endif %}
+{% endmacro %}
+
+
 <!-- =========================================================
      HEADER + MONTH PICKER
      ========================================================= -->
@@ -235,6 +347,11 @@
         <p class="progress-caption">
             {{ payments.covered_percent | pct }} del mes cubierto
             ({{ payments.covered | mxn }} de {{ payments.total | mxn }})
+            {% if payments.used > 0 %}
+            <br>
+            De lo apartado llevas usado {{ payments.used | mxn }};
+            quedan {{ payments.unused | mxn }}.
+            {% endif %}
         </p>
 
         {% if expenses %}
@@ -595,7 +712,7 @@
                     <th data-sort="text">Categoría</th>
                     <th data-sort="text">Tipo</th>
                     <th class="text-right" data-sort="number">Monto</th>
-                    <th data-sort="number">Ya juntado</th>
+                    <th data-sort="number">Ya juntado / usado</th>
                     <th data-sort="text">Estado del pago</th>
                 </tr>
             </thead>
@@ -631,6 +748,7 @@
 
                             {% if expense.payment_status == "pending" %}
 
+                            {# Falta por juntar: se registran abonos #}
                             <div class="saved-figures">
                                 <strong>{{ expense.saved | mxn }}</strong>
                                 <small class="table-note">
@@ -645,50 +763,30 @@
                                 ></div>
                             </div>
 
-                            <form method="post" action="/payments/saved" class="saved-form">
+                            {{ movement_form(expense, "deposit", "Abono", "Nota (opcional)") }}
 
-                                <input type="hidden" name="expense_id" value="{{ expense.id }}">
-                                <input type="hidden" name="month" value="{{ month }}">
-                                <input type="hidden" name="year" value="{{ year }}">
+                            {% elif expense.payment_status == "reserved" %}
 
-                                <input
-                                    type="number"
-                                    name="amount"
-                                    step="0.01"
-                                    class="saved-input"
-                                    placeholder="Abono"
-                                    aria-label="Abonar a {{ expense.concept }}"
-                                >
+                            {# Ya apartado: el dinero está, se registra en qué se usa #}
+                            <div class="saved-figures">
+                                <strong>Usado {{ expense.used | mxn }}</strong>
+                                <small class="table-note {% if expense.unused < 0 %}amount-negative{% endif %}">
+                                    {% if expense.unused < 0 %}
+                                        te pasaste {{ (-expense.unused) | mxn }}
+                                    {% else %}
+                                        quedan {{ expense.unused | mxn }}
+                                    {% endif %}
+                                </small>
+                            </div>
 
-                                <input
-                                    type="text"
-                                    name="note"
-                                    class="saved-note"
-                                    maxlength="200"
-                                    placeholder="Nota (opcional)"
-                                    aria-label="Nota del abono a {{ expense.concept }}"
-                                >
+                            <div class="progress-track progress-track-sm">
+                                <div
+                                    class="progress-bar progress-bar--warning"
+                                    style="width: {{ '%.1f'|format(expense.used_percent) }}%;"
+                                ></div>
+                            </div>
 
-                                <button
-                                    type="submit"
-                                    name="action"
-                                    value="add"
-                                    class="button button-secondary button-sm"
-                                    title="Registrar este abono"
-                                >+</button>
-
-                                {% if expense.deposits %}
-                                <button
-                                    type="submit"
-                                    name="action"
-                                    value="reset"
-                                    class="button button-ghost button-sm"
-                                    title="Borrar todos los abonos de este gasto"
-                                    data-confirm="¿Borrar los {{ expense.deposits|length }} abono(s) de «{{ expense.concept }}» de {{ month_name }}?"
-                                >✕</button>
-                                {% endif %}
-
-                            </form>
+                            {{ movement_form(expense, "spend", "Uso", "¿En qué se fue?") }}
 
                             {% else %}
 
@@ -696,54 +794,7 @@
 
                             {% endif %}
 
-                            {% if expense.deposits %}
-                            <details class="deposit-log">
-
-                                <summary>
-                                    {{ expense.deposits|length }}
-                                    {% if expense.deposits|length == 1 %}abono{% else %}abonos{% endif %}
-                                </summary>
-
-                                <ul class="deposit-list">
-                                    {% for deposit in expense.deposits %}
-                                    <li>
-
-                                        <div class="deposit-head">
-                                            <strong class="{% if deposit.amount < 0 %}amount-negative{% endif %}">
-                                                {{ deposit.amount | mxn }}
-                                            </strong>
-
-                                            <time datetime="{{ deposit.created_at }}">
-                                                {{ deposit.created_at | datetime_mx }}
-                                            </time>
-
-                                            <form
-                                                method="post"
-                                                action="/payments/saved/delete"
-                                                data-confirm="¿Borrar el abono de {{ deposit.amount | mxn }} del {{ deposit.created_at | datetime_mx }}?"
-                                            >
-                                                <input type="hidden" name="deposit_id" value="{{ deposit.id }}">
-                                                <input type="hidden" name="month" value="{{ month }}">
-                                                <input type="hidden" name="year" value="{{ year }}">
-                                                <button
-                                                    type="submit"
-                                                    class="deposit-delete"
-                                                    title="Borrar este abono"
-                                                    aria-label="Borrar el abono de {{ deposit.amount | mxn }}"
-                                                >✕</button>
-                                            </form>
-                                        </div>
-
-                                        {% if deposit.note %}
-                                        <p class="deposit-note">{{ deposit.note }}</p>
-                                        {% endif %}
-
-                                    </li>
-                                    {% endfor %}
-                                </ul>
-
-                            </details>
-                            {% endif %}
+                            {{ movement_log(expense) }}
 
                         </div>
                     </td>

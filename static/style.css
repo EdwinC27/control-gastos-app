@@ -1865,3 +1865,30 @@ input.is-calculated {
     line-height: 1.35;
     overflow-wrap: anywhere;
 }
+
+
+/* ---- movement kind (abono / uso) ------------------------- */
+
+.movement-kind {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.movement-kind--deposit {
+    background: var(--success-light);
+    color: var(--success);
+}
+
+.movement-kind--spend {
+    background: var(--warning-light);
+    color: var(--warning);
+}
+
+.deposit-clear {
+    margin-top: 8px;
+}
