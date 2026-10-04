@@ -1892,3 +1892,52 @@ input.is-calculated {
 .deposit-clear {
     margin-top: 8px;
 }
+
+
+/* ---- movements tab --------------------------------------- */
+
+.movement-link {
+    display: inline-block;
+    margin-top: 2px;
+    color: var(--primary-text);
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.movement-link:hover {
+    text-decoration: underline;
+}
+
+.movement-note {
+    color: var(--text-secondary);
+    max-width: 320px;
+    overflow-wrap: anywhere;
+}
+
+.alert-info {
+    background: var(--primary-light);
+    border: 1px solid var(--info-border);
+    color: var(--text);
+}
+
+.alert-info a {
+    color: var(--primary-text);
+}
+
+
+/* ---- deduced movement kind ------------------------------- */
+
+.kind-preview {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    min-height: 40px;
+    margin: 0;
+    padding: 8px 10px;
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+    background: var(--surface-light);
+    font-size: 0.85rem;
+}

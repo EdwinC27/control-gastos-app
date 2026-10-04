@@ -1,0 +1,342 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+
+{% block title %}Movimientos{% endblock %}
+
+{% block content %}
+
+<!-- =========================================================
+     HEADER + MONTH PICKER
+     ========================================================= -->
+
+<header class="page-header">
+
+    <div>
+        <h1>Movimientos</h1>
+        <p class="page-description">
+            Abonos y usos de {{ month_name }} {{ year }}
+        </p>
+    </div>
+
+    <form method="get" action="/movements" class="month-selector">
+
+        <a
+            href="/movements?month={{ previous_month }}&year={{ previous_year }}"
+            class="button button-secondary button-icon"
+            aria-label="Mes anterior ({{ previous_month_name }})"
+            title="Mes anterior"
+        >←</a>
+
+        <div class="form-group">
+            <label for="month">Mes</label>
+            <select id="month" name="month">
+                {% for number, name in MONTHS %}
+                <option value="{{ number }}" {% if number == month %}selected{% endif %}>
+                    {{ name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="year">Año</label>
+            <input
+                type="number"
+                id="year"
+                name="year"
+                value="{{ year }}"
+                min="{{ MIN_YEAR }}"
+                max="{{ MAX_YEAR }}"
+            >
+        </div>
+
+        <button type="submit" class="button button-primary">Ver mes</button>
+
+        <a
+            href="/movements?month={{ next_month }}&year={{ next_year }}"
+            class="button button-secondary button-icon"
+            aria-label="Mes siguiente"
+            title="Mes siguiente"
+        >→</a>
+
+        <a href="/movements" class="button button-secondary">Este mes</a>
+
+    </form>
+
+</header>
+
+
+{% if focus_id %}
+<div class="alert alert-info" role="status">
+    Mostrando solo los movimientos de
+    <strong>{{ focus.concept or "ese gasto" }}</strong>.
+    <a href="/movements?month={{ month }}&year={{ year }}">Ver todos los del mes</a>
+</div>
+{% endif %}
+
+
+<!-- =========================================================
+     TOTALES
+     ========================================================= -->
+
+<section class="summary-grid summary-grid-3">
+
+    <div class="summary-card">
+        <div class="summary-card-label">Abonado</div>
+        <div class="summary-card-value amount-positive">{{ totals.deposits | mxn }}</div>
+        <div class="summary-card-description">
+            {{ totals.n_deposits }} abono(s) · dinero que juntaste
+        </div>
+    </div>
+
+    <div class="summary-card">
+        <div class="summary-card-label">Usado</div>
+        <div class="summary-card-value">{{ totals.spends | mxn }}</div>
+        <div class="summary-card-description">
+            {{ totals.n_spends }} uso(s) · dinero que ya ocupaste
+        </div>
+    </div>
+
+    <div class="summary-card">
+        <div class="summary-card-label">Movimientos</div>
+        <div class="summary-card-value">{{ movements | length }}</div>
+        <div class="summary-card-description">registros en {{ month_name }}</div>
+    </div>
+
+</section>
+
+
+<!-- =========================================================
+     REGISTRAR
+     ========================================================= -->
+
+<section class="card">
+
+    <div class="card-header">
+        <div>
+            <h2>Registrar movimiento</h2>
+            <p>
+                Un <strong>abono</strong> es dinero que juntas para el gasto;
+                un <strong>uso</strong> es dinero que ya ocupaste de lo que
+                tenías apartado. Ninguno cambia los totales del mes.
+            </p>
+        </div>
+    </div>
+
+    {% if expense_options %}
+
+    <form method="post" action="/payments/movement" class="form">
+
+        <input type="hidden" name="month" value="{{ month }}">
+        <input type="hidden" name="year" value="{{ year }}">
+        <input type="hidden" name="back" value="movements">
+        <input type="hidden" name="focus" value="{{ focus_id }}">
+
+        <div class="form-grid">
+
+            <div class="form-group form-group-wide">
+                <label for="expense_id">Gasto</label>
+                <select id="expense_id" name="expense_id" required>
+                    <option value="">Selecciona un gasto de {{ month_name }}</option>
+                    {% for option in expense_options %}
+                    <option
+                        value="{{ option.id }}"
+                        data-kind="{{ option.kind }}"
+                        data-kind-label="{{ option.kind_label }}"
+                        data-status-label="{{ option.status_label }}"
+                        {% if option.id == focus_id %}selected{% endif %}
+                    >
+                        {{ option.concept }} — {{ option.amount | mxn }}
+                        ({{ option.status_label }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Tipo</label>
+                <p class="kind-preview" data-movement-kind>
+                    <span class="text-light">Elige un gasto</span>
+                </p>
+                <small class="field-hint">
+                    Lo decide el estado del gasto: si falta por juntar es un
+                    abono, y si ya está apartado es un uso.
+                </small>
+            </div>
+
+            <div class="form-group">
+                <label for="amount">Monto</label>
+                <div class="input-money">
+                    <span>$</span>
+                    <input
+                        type="number"
+                        id="amount"
+                        name="amount"
+                        step="0.01"
+                        placeholder="0.00"
+                        required
+                    >
+                </div>
+            </div>
+
+            <div class="form-group form-group-wide">
+                <label for="note">
+                    Nota
+                    <span class="optional">(opcional)</span>
+                </label>
+                <input
+                    type="text"
+                    id="note"
+                    name="note"
+                    maxlength="200"
+                    placeholder="Ej. Carga en la Shell, quincena del 15..."
+                >
+            </div>
+
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="button button-primary">
+                + Registrar
+            </button>
+        </div>
+
+    </form>
+
+    {% else %}
+
+    <div class="empty-state">
+        <p>
+            No hay gastos de {{ month_name }} {{ year }} con algo que registrar.
+            Los que ya están pagados no aparecen aquí.
+        </p>
+    </div>
+
+    {% endif %}
+
+</section>
+
+
+<!-- =========================================================
+     LISTA
+     ========================================================= -->
+
+<section class="card" id="movement-list">
+
+    <div class="card-header">
+        <div>
+            <h2>Historial de {{ month_name }}</h2>
+            <p>Del más reciente al más antiguo. Haz clic en una columna para ordenar.</p>
+        </div>
+    </div>
+
+    {% if movements %}
+
+    {{ m.table_toolbar(
+        "movements",
+        [
+            ("kind", "Tipo", MOVEMENT_KINDS),
+            ("category", "Categoría", category_filters)
+        ]
+    ) }}
+
+    <div class="table-container">
+        <table data-table="movements">
+
+            <thead>
+                <tr>
+                    <th data-sort="date">Fecha y hora</th>
+                    <th data-sort="text">Gasto</th>
+                    <th data-sort="text">Categoría</th>
+                    <th data-sort="text">Tipo</th>
+                    <th class="text-right" data-sort="number">Monto</th>
+                    <th>Nota</th>
+                    <th class="text-center">Acciones</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for movement in movements %}
+                <tr
+                    data-kind="{{ movement.kind }}"
+                    data-category="{{ movement.category }}"
+                    data-search="{{ movement.concept }} {{ movement.category }} {{ movement.label }} {{ movement.note }}"
+                >
+
+                    <td class="nowrap" data-value="{{ movement.created_at }}">
+                        {{ movement.created_at | datetime_mx }}
+                    </td>
+
+                    <td data-value="{{ movement.concept }}">
+                        <a href="/expenses/edit/{{ movement.expense_id }}" class="table-link">
+                            {{ movement.concept }}
+                        </a>
+                    </td>
+
+                    <td data-value="{{ movement.category }}">
+                        {% if movement.category %}
+                        <span class="badge">{{ movement.category }}</span>
+                        {% endif %}
+                    </td>
+
+                    <td data-value="{{ movement.label }}">
+                        <span class="movement-kind movement-kind--{{ movement.kind }}">
+                            {{ movement.label }}
+                        </span>
+                    </td>
+
+                    <td class="text-right amount {% if movement.kind == 'spend' %}amount-negative{% else %}amount-positive{% endif %}"
+                        data-value="{{ movement.amount }}">
+                        {{ movement.amount | mxn }}
+                    </td>
+
+                    <td class="movement-note">{{ movement.note }}</td>
+
+                    <td class="col-actions">
+                        <form
+                            method="post"
+                            action="/payments/movement/delete"
+                            data-confirm="¿Borrar el movimiento de {{ movement.amount | mxn }} de «{{ movement.concept }}»?"
+                        >
+                            <input type="hidden" name="movement_id" value="{{ movement.id }}">
+                            <input type="hidden" name="month" value="{{ month }}">
+                            <input type="hidden" name="year" value="{{ year }}">
+                            <input type="hidden" name="back" value="movements">
+                            <input type="hidden" name="focus" value="{{ focus_id }}">
+                            <button
+                                type="submit"
+                                class="button button-danger button-sm"
+                                title="Borrar este movimiento"
+                                aria-label="Borrar el movimiento de {{ movement.amount | mxn }}"
+                            >🗑️</button>
+                        </form>
+                    </td>
+
+                </tr>
+                {% endfor %}
+            </tbody>
+
+        </table>
+    </div>
+
+    <div class="empty-state" data-table-empty="movements" hidden>
+        <div class="empty-state-icon">🔎</div>
+        <h3>Ningún movimiento coincide con el filtro</h3>
+        <p>Cambia la búsqueda o pulsa «Limpiar».</p>
+    </div>
+
+    {% else %}
+
+    <div class="empty-state">
+        <div class="empty-state-icon">🔁</div>
+        <h3>Todavía no hay movimientos en {{ month_name }}</h3>
+        <p>
+            Regístralos aquí arriba, o desde la tabla de gastos del dashboard.
+        </p>
+    </div>
+
+    {% endif %}
+
+</section>
+
+{% endblock %}

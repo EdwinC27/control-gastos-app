@@ -1032,6 +1032,23 @@ def spend_totals(period):
     return _totals_by_expense(period, "spend")
 
 
+def movement_kind_for(expense_id, period):
+    """
+    The only kind of movement that makes sense for an expense right now.
+
+    While the money is still missing you register abonos; once it is
+    set aside (or already paid) what is left to register is how it is
+    being spent.
+    """
+
+    status = payment_entries(period).get(
+        str(expense_id).strip(),
+        {}
+    ).get("status", "pending")
+
+    return "spend" if status in ("reserved", "paid") else "deposit"
+
+
 def add_movement(expense_id, period, amount, note="", kind="deposit", limit=None):
     """
     Register an abono or a uso (a negative amount corrects a mistake)
@@ -1499,6 +1516,7 @@ templates.env.globals.update(
         "EXPENSE_TYPES": EXPENSE_TYPES,
         "FREQUENCIES": FREQUENCIES,
         "PAYMENT_STATUSES": PAYMENT_STATUSES,
+        "MOVEMENT_KINDS": MOVEMENT_KINDS,
         "MONTHS": MONTHS,
         "MIN_YEAR": MIN_YEAR,
         "MAX_YEAR": MAX_YEAR,

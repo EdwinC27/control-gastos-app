@@ -332,6 +332,49 @@
 
 
     // ========================================================
+    // MOVEMENT KIND (Movimientos tab)
+    // The kind is not a choice: it follows the state of the expense.
+    // This only previews what the server will store.
+    // ========================================================
+
+    function setUpMovementKind() {
+
+        var expense = document.getElementById("expense_id");
+        var preview = document.querySelector("[data-movement-kind]");
+
+        if (!expense || !preview) {
+            return;
+        }
+
+        function refresh() {
+
+            var option = expense.options[expense.selectedIndex];
+            var kind = option ? option.dataset.kind : "";
+
+            if (!kind) {
+                preview.innerHTML = '<span class="text-light">Elige un gasto</span>';
+                return;
+            }
+
+            preview.innerHTML = (
+                '<span class="movement-kind movement-kind--' + kind + '">'
+                + option.dataset.kindLabel
+                + "</span> "
+                + '<span class="text-light">porque está en «'
+                + option.dataset.statusLabel
+                + '»</span>'
+            );
+
+        }
+
+        expense.addEventListener("change", refresh);
+
+        refresh();
+
+    }
+
+
+    // ========================================================
     // UTILITIES
     // ========================================================
 
@@ -365,6 +408,7 @@
         setUpMonthPicker();
         setUpDates();
         setUpInstallments();
+        setUpMovementKind();
 
     });
 

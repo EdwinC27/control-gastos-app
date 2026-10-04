@@ -22,6 +22,7 @@ from common import (
     applies_to_month,
     clear_movements,
     delete_movement,
+    movement_kind_for,
     normalize_payment_status,
     period_key,
     read_csv,
@@ -36,7 +37,21 @@ router = APIRouter(
 )
 
 
-def _back_to_dashboard(month, year):
+def _go_back(month, year, back="", expense_id=""):
+    """
+    Return to wherever the movement was registered: the dashboard or
+    the Movimientos tab (keeping its filter).
+    """
+
+    if (back or "").strip() == "movements":
+
+        url = f"/movements?month={month}&year={year}"
+
+        if expense_id:
+            url += f"&expense={expense_id}"
+
+        return RedirectResponse(url=f"{url}#movement-list", status_code=303)
+
     return RedirectResponse(
         url=f"/?month={month}&year={year}#month-payments",
         status_code=303
@@ -89,7 +104,7 @@ async def set_status(
             normalize_payment_status(status)
         )
 
-    return _back_to_dashboard(month, year)
+    return _go_back(month, year)
 
 
 # ============================================================
@@ -101,10 +116,15 @@ async def register_movement(
     expense_id: str = Form(""),
     amount: str = Form(""),
     note: str = Form(""),
-    kind: str = Form("deposit"),
     month: int = Form(0),
-    year: int = Form(0)
+    year: int = Form(0),
+    back: str = Form(""),
+    focus: str = Form("")
 ):
+    """
+    Register an abono or a uso. The kind is never taken from the form:
+    it comes from the state of the expense, so it cannot be wrong.
+    """
 
     if not _valid_period(month, year):
         return RedirectResponse(url="/", status_code=303)
@@ -112,28 +132,33 @@ async def register_movement(
     expense_id = (expense_id or "").strip()
 
     if not expense_id:
-        return _back_to_dashboard(month, year)
+        return _go_back(month, year, back, focus)
 
     amount = to_amount((amount or "").replace("$", "").replace(",", ""))
 
     if amount:
+
+        period = period_key(month, year)
+
         add_movement(
             expense_id,
-            period_key(month, year),
+            period,
             amount,
             note,
-            kind,
+            movement_kind_for(expense_id, period),
             _expense_amount(expense_id, month, year)
         )
 
-    return _back_to_dashboard(month, year)
+    return _go_back(month, year, back, focus)
 
 
 @router.post("/movement/delete")
 async def remove_movement(
     movement_id: str = Form(""),
     month: int = Form(0),
-    year: int = Form(0)
+    year: int = Form(0),
+    back: str = Form(""),
+    focus: str = Form("")
 ):
 
     if not _valid_period(month, year):
@@ -144,7 +169,7 @@ async def remove_movement(
     if movement_id:
         delete_movement(movement_id)
 
-    return _back_to_dashboard(month, year)
+    return _go_back(month, year, back, focus)
 
 
 @router.post("/movement/clear")
@@ -152,7 +177,9 @@ async def clear_expense_movements(
     expense_id: str = Form(""),
     kind: str = Form(""),
     month: int = Form(0),
-    year: int = Form(0)
+    year: int = Form(0),
+    back: str = Form(""),
+    focus: str = Form("")
 ):
 
     if not _valid_period(month, year):
@@ -167,7 +194,7 @@ async def clear_expense_movements(
             kind or None
         )
 
-    return _back_to_dashboard(month, year)
+    return _go_back(month, year, back, focus)
 
 
 # ============================================================
@@ -200,4 +227,4 @@ async def set_all_statuses(
         if status == "pending":
             clear_movements(expense_id, period)
 
-    return _back_to_dashboard(month, year)
+    return _go_back(month, year)

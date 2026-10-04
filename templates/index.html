@@ -13,8 +13,6 @@
     <input type="hidden" name="expense_id" value="{{ expense.id }}">
     <input type="hidden" name="month" value="{{ month }}">
     <input type="hidden" name="year" value="{{ year }}">
-    <input type="hidden" name="kind" value="{{ kind }}">
-
     <input
         type="number"
         name="amount"
@@ -40,79 +38,6 @@
     >+</button>
 
 </form>
-{% endmacro %}
-
-
-{# ------------------------------------------------------------
-   Historial de abonos y usos de un gasto en el mes
-   ------------------------------------------------------------ #}
-{% macro movement_log(expense) %}
-{% if expense.movements %}
-<details class="deposit-log">
-
-    <summary>
-        {{ expense.movements|length }}
-        {% if expense.movements|length == 1 %}movimiento{% else %}movimientos{% endif %}
-    </summary>
-
-    <ul class="deposit-list">
-        {% for movement in expense.movements %}
-        <li>
-
-            <div class="deposit-head">
-                <span class="movement-kind movement-kind--{{ movement.kind }}">
-                    {{ movement.label }}
-                </span>
-
-                <strong class="{% if movement.amount < 0 %}amount-negative{% endif %}">
-                    {{ movement.amount | mxn }}
-                </strong>
-
-                <time datetime="{{ movement.created_at }}">
-                    {{ movement.created_at | datetime_mx }}
-                </time>
-
-                <form
-                    method="post"
-                    action="/payments/movement/delete"
-                    data-confirm="¿Borrar el movimiento de {{ movement.amount | mxn }} del {{ movement.created_at | datetime_mx }}?"
-                >
-                    <input type="hidden" name="movement_id" value="{{ movement.id }}">
-                    <input type="hidden" name="month" value="{{ month }}">
-                    <input type="hidden" name="year" value="{{ year }}">
-                    <button
-                        type="submit"
-                        class="deposit-delete"
-                        title="Borrar este movimiento"
-                        aria-label="Borrar el movimiento de {{ movement.amount | mxn }}"
-                    >✕</button>
-                </form>
-            </div>
-
-            {% if movement.note %}
-            <p class="deposit-note">{{ movement.note }}</p>
-            {% endif %}
-
-        </li>
-        {% endfor %}
-    </ul>
-
-    <form
-        method="post"
-        action="/payments/movement/clear"
-        class="deposit-clear"
-        data-confirm="¿Borrar los {{ expense.movements|length }} movimiento(s) de «{{ expense.concept }}» de {{ month_name }}?"
-    >
-        <input type="hidden" name="expense_id" value="{{ expense.id }}">
-        <input type="hidden" name="month" value="{{ month }}">
-        <input type="hidden" name="year" value="{{ year }}">
-        <button type="submit" class="button button-ghost button-sm">
-            Borrar todo el historial
-        </button>
-    </form>
-
-</details>
-{% endif %}
 {% endmacro %}
 
 
@@ -365,6 +290,13 @@
                     Marcar todo como pagado
                 </button>
             </form>
+
+            <a
+                href="/movements?month={{ month }}&year={{ year }}"
+                class="button button-secondary button-sm"
+            >
+                Ver movimientos del mes
+            </a>
 
             <form
                 method="post"
@@ -794,7 +726,15 @@
 
                             {% endif %}
 
-                            {{ movement_log(expense) }}
+                            {% if expense.movements %}
+                            <a
+                                class="movement-link"
+                                href="/movements?month={{ month }}&year={{ year }}&expense={{ expense.id }}"
+                            >
+                                {{ expense.movements|length }}
+                                {% if expense.movements|length == 1 %}movimiento{% else %}movimientos{% endif %} →
+                            </a>
+                            {% endif %}
 
                         </div>
                     </td>
