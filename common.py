@@ -41,7 +41,7 @@ for _folder in (DATA_DIR, TEMPLATES_DIR, STATIC_DIR):
 EXPENSES_FILE = DATA_DIR / "gastos.csv"
 INCOME_FILE = DATA_DIR / "ingresos.csv"
 PAYMENTS_FILE = DATA_DIR / "pagos.csv"
-DEPOSITS_FILE = DATA_DIR / "abonos.csv"
+MOVEMENTS_FILE = DATA_DIR / "movimientos.csv"
 CATEGORIES_FILE = DATA_DIR / "categorias.csv"
 
 EXPENSE_FIELDS = [
@@ -77,16 +77,25 @@ PAYMENT_FIELDS = [
     "updated",
 ]
 
-# Every abono: money put aside for one expense in one month, with its
-# own note and timestamp. The total saved is the sum of these rows.
-DEPOSIT_FIELDS = [
+# Every movement of one expense in one month, with its own note and
+# timestamp: an abono (money put aside) or a uso (money spent out of
+# what was already put aside).
+MOVEMENT_FIELDS = [
     "id",
     "expense_id",
     "period",
+    "kind",
     "amount",
     "note",
     "created_at",
 ]
+
+MOVEMENT_KINDS = [
+    ("deposit", "Abono"),
+    ("spend", "Uso"),
+]
+
+MOVEMENT_KIND_LABELS = dict(MOVEMENT_KINDS)
 
 CATEGORY_FIELDS = [
     "name",
@@ -303,6 +312,12 @@ def normalize_expense_type(value):
     return _EXPENSE_TYPE_ALIASES.get((value or "").strip().lower(), "")
 
 
+def normalize_movement_kind(value):
+    """Returns 'spend' for a uso and 'deposit' for anything else."""
+
+    return "spend" if (value or "").strip().lower() == "spend" else "deposit"
+
+
 def normalize_payment_status(value):
     """Returns 'pending', 'reserved' or 'paid'."""
 
@@ -335,6 +350,26 @@ def add_years(value, years):
 # CSV (safe reading and writing)
 # ============================================================
 
+# Files that changed name between versions: {new name: old name}
+LEGACY_FILES = {
+    "movimientos.csv": "abonos.csv",
+}
+
+
+def _rename_legacy_file(path):
+    """Pick up a data file saved under its previous name."""
+
+    previous = LEGACY_FILES.get(path.name)
+
+    if not previous or path.exists():
+        return
+
+    old_path = path.parent / previous
+
+    if old_path.exists():
+        old_path.rename(path)
+
+
 def _create_if_missing(path, fields):
     if not path.exists():
         with open(path, "w", encoding="utf-8-sig", newline="") as handle:
@@ -352,6 +387,9 @@ def _normalize_values(record, fields):
 
     if "status" in fields and record.get("status"):
         record["status"] = normalize_payment_status(record["status"])
+
+    if "kind" in fields:
+        record["kind"] = normalize_movement_kind(record.get("kind"))
 
     return record
 
@@ -406,8 +444,9 @@ def ensure_files():
     for path, fields in (
         (EXPENSES_FILE, EXPENSE_FIELDS),
         (INCOME_FILE, INCOME_FIELDS),
-        (DEPOSITS_FILE, DEPOSIT_FIELDS),
+        (MOVEMENTS_FILE, MOVEMENT_FIELDS),
     ):
+        _rename_legacy_file(path)
         _create_if_missing(path, fields)
         _migrate(path, fields)
 
@@ -896,22 +935,28 @@ def set_payment_status(expense_id, period, status):
 
 
 # ============================================================
-# ABONOS (money put aside little by little, with notes)
+# MOVEMENTS: ABONOS AND USOS
+#
+# An abono is money put aside for an expense. A uso is money spent
+# out of what was already put aside (useful once the expense is
+# reserved: the money is still gathered, you are just tracking where
+# it goes). Both carry a note and the date and time they happened.
 # ============================================================
 
-def read_deposits():
-    return read_csv(DEPOSITS_FILE)
+def read_movements():
+    return read_csv(MOVEMENTS_FILE)
 
 
-def write_deposits(deposits):
-    write_csv(DEPOSITS_FILE, DEPOSIT_FIELDS, deposits)
+def write_movements(movements):
+    write_csv(MOVEMENTS_FILE, MOVEMENT_FIELDS, movements)
 
 
-def deposits_of(period, expense_id=None):
+def movements_of(period, expense_id=None, kind=None):
     """
-    Abonos of one month, newest first.
+    Movements of one month, newest first.
 
-    With 'expense_id' only that expense's abonos are returned.
+    'expense_id' narrows it to a single expense and 'kind' to abonos
+    ('deposit') or usos ('spend').
     """
 
     period = (period or "").strip()
@@ -919,127 +964,157 @@ def deposits_of(period, expense_id=None):
 
     found = []
 
-    for deposit in read_deposits():
+    for movement in read_movements():
 
-        if (deposit.get("period") or "").strip() != period:
+        if (movement.get("period") or "").strip() != period:
             continue
 
         if wanted is not None:
-            if (deposit.get("expense_id") or "").strip() != wanted:
+            if (movement.get("expense_id") or "").strip() != wanted:
                 continue
+
+        movement_kind = normalize_movement_kind(movement.get("kind"))
+
+        if kind is not None and movement_kind != kind:
+            continue
 
         found.append(
             {
-                "id": (deposit.get("id") or "").strip(),
-                "expense_id": (deposit.get("expense_id") or "").strip(),
+                "id": (movement.get("id") or "").strip(),
+                "expense_id": (movement.get("expense_id") or "").strip(),
                 "period": period,
-                "amount": to_amount(deposit.get("amount")),
-                "note": (deposit.get("note") or "").strip(),
-                "created_at": (deposit.get("created_at") or "").strip(),
+                "kind": movement_kind,
+                "label": MOVEMENT_KIND_LABELS[movement_kind],
+                "amount": to_amount(movement.get("amount")),
+                "note": (movement.get("note") or "").strip(),
+                "created_at": (movement.get("created_at") or "").strip(),
             }
         )
 
-    found.sort(key=lambda d: (d["created_at"], d["id"]), reverse=True)
+    found.sort(key=lambda m: (m["created_at"], m["id"]), reverse=True)
 
     return found
 
 
-def deposits_by_expense(period):
-    """{'12': [abono, abono, ...], ...} for one month, newest first."""
+def movements_by_expense(period):
+    """{'12': [movement, ...], ...} for one month, newest first."""
 
     grouped = {}
 
-    for deposit in deposits_of(period):
-        grouped.setdefault(deposit["expense_id"], []).append(deposit)
+    for movement in movements_of(period):
+        grouped.setdefault(movement["expense_id"], []).append(movement)
 
     return grouped
 
 
-def deposit_totals(period):
-    """{'12': 6039.0, ...} with how much is saved for each expense."""
+def _totals_by_expense(period, kind):
 
     totals = {}
 
-    for deposit in deposits_of(period):
+    for movement in movements_of(period, kind=kind):
 
-        totals[deposit["expense_id"]] = (
-            totals.get(deposit["expense_id"], 0.0) + deposit["amount"]
+        totals[movement["expense_id"]] = (
+            totals.get(movement["expense_id"], 0.0) + movement["amount"]
         )
 
     return totals
 
 
-def add_deposit(expense_id, period, amount, note="", limit=None):
+def deposit_totals(period):
+    """{'12': 6039.0, ...} with how much is saved for each expense."""
+
+    return _totals_by_expense(period, "deposit")
+
+
+def spend_totals(period):
+    """{'9': 600.0, ...} with how much has been spent for each expense."""
+
+    return _totals_by_expense(period, "spend")
+
+
+def add_movement(expense_id, period, amount, note="", kind="deposit", limit=None):
     """
-    Register an abono (a negative amount corrects a mistake) and stamp
-    it with the current date and time.
+    Register an abono or a uso (a negative amount corrects a mistake)
+    and stamp it with the current date and time.
 
     When the abonos add up to the whole amount of the expense, it is
-    marked as reserved on its own. Returns the new total saved.
+    marked as reserved on its own. Returns the resulting total of that
+    kind for the expense.
     """
 
     expense_id = str(expense_id).strip()
+    kind = normalize_movement_kind(kind)
     amount = to_amount(amount)
 
-    deposits = read_deposits()
+    movements = read_movements()
 
-    deposits.append(
+    movements.append(
         {
-            "id": next_id(deposits),
+            "id": next_id(movements),
             "expense_id": expense_id,
             "period": period,
+            "kind": kind,
             "amount": f"{amount:.2f}",
             "note": (note or "").strip()[:200],
             "created_at": datetime.now().isoformat(timespec="seconds"),
         }
     )
 
-    write_deposits(deposits)
+    write_movements(movements)
 
-    total = deposit_totals(period).get(expense_id, 0.0)
+    total = _totals_by_expense(period, kind).get(expense_id, 0.0)
 
-    if limit is not None and limit > 0 and total >= limit:
+    if kind == "deposit" and limit is not None and limit > 0 and total >= limit:
         set_payment_status(expense_id, period, "reserved")
 
     return total
 
 
-def delete_deposit(deposit_id):
-    """Remove one abono."""
+def delete_movement(movement_id):
+    """Remove one abono or uso."""
 
-    deposit_id = str(deposit_id).strip()
+    movement_id = str(movement_id).strip()
 
-    write_deposits(
+    write_movements(
         [
-            deposit
-            for deposit in read_deposits()
-            if (deposit.get("id") or "").strip() != deposit_id
+            movement
+            for movement in read_movements()
+            if (movement.get("id") or "").strip() != movement_id
         ]
     )
 
 
-def clear_deposits(expense_id, period=None):
-    """Remove every abono of an expense (optionally, of one month)."""
+def clear_movements(expense_id, period=None, kind=None):
+    """
+    Remove the movements of an expense: all of them, or only those of
+    one month and/or one kind.
+    """
 
     expense_id = str(expense_id).strip()
     period = (period or "").strip()
 
     kept = []
 
-    for deposit in read_deposits():
+    for movement in read_movements():
 
-        same_expense = (deposit.get("expense_id") or "").strip() == expense_id
+        same_expense = (movement.get("expense_id") or "").strip() == expense_id
+
         same_period = (
             not period
-            or (deposit.get("period") or "").strip() == period
+            or (movement.get("period") or "").strip() == period
         )
 
-        if same_expense and same_period:
+        same_kind = (
+            kind is None
+            or normalize_movement_kind(movement.get("kind")) == kind
+        )
+
+        if same_expense and same_period and same_kind:
             continue
 
-        kept.append(deposit)
+        kept.append(movement)
 
-    write_deposits(kept)
+    write_movements(kept)
 
 
 def _migrate_saved_column():
@@ -1057,14 +1132,14 @@ def _migrate_saved_column():
     if "saved" not in header:
         return
 
-    deposits = read_deposits()
+    movements = read_movements()
 
     known = {
         (
-            (deposit.get("expense_id") or "").strip(),
-            (deposit.get("period") or "").strip(),
+            (movement.get("expense_id") or "").strip(),
+            (movement.get("period") or "").strip(),
         )
-        for deposit in deposits
+        for movement in movements
     }
 
     added = False
@@ -1082,11 +1157,12 @@ def _migrate_saved_column():
         if (expense_id, period) in known:
             continue
 
-        deposits.append(
+        movements.append(
             {
-                "id": next_id(deposits),
+                "id": next_id(movements),
                 "expense_id": expense_id,
                 "period": period,
+                "kind": "deposit",
                 "amount": f"{saved:.2f}",
                 "note": "Abono registrado antes de las notas",
                 "created_at": (
@@ -1099,11 +1175,11 @@ def _migrate_saved_column():
         added = True
 
     if added:
-        write_deposits(deposits)
+        write_movements(movements)
 
 
 def clear_payments(expense_id):
-    """Drop the payment history and the abonos of a deleted expense."""
+    """Drop the payment history and the movements of a deleted expense."""
 
     expense_id = str(expense_id).strip()
 
@@ -1115,7 +1191,7 @@ def clear_payments(expense_id):
 
     write_payments(payments)
 
-    clear_deposits(expense_id)
+    clear_movements(expense_id)
 
 
 # ============================================================

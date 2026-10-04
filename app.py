@@ -21,13 +21,14 @@ from common import (
     MONTH_NAMES,
     STATIC_DIR,
     applies_to_month,
-    deposits_by_expense,
+    movements_by_expense,
     ensure_files,
     installment_info,
     is_active,
     normalize_expense_type,
     payment_entries,
     payment_statuses,
+    spend_totals,
     period_key,
     read_csv,
     render,
@@ -178,6 +179,7 @@ def payment_summary(month_expenses):
         "reserved": 0.0,
         "saved": 0.0,
         "pending": 0.0,
+        "used": 0.0,
         "n_paid": 0,
         "n_reserved": 0,
         "n_saved": 0,
@@ -204,11 +206,17 @@ def payment_summary(month_expenses):
             if expense["saved"] > 0:
                 summary["n_saved"] += 1
 
+        if status == "reserved":
+            summary["used"] += expense["used"]
+
     summary["covered"] = (
         summary["paid"] + summary["reserved"] + summary["saved"]
     )
 
     summary["total"] = summary["covered"] + summary["pending"]
+
+    # What is left of the money already set aside.
+    summary["unused"] = summary["reserved"] - summary["used"]
 
     summary["covered_percent"] = (
         summary["covered"] / summary["total"] * 100
@@ -314,7 +322,8 @@ async def dashboard(
     # ---- payment status and abonos of every expense of the month -
     period = period_key(month, year)
     entries = payment_entries(period)
-    deposits = deposits_by_expense(period)
+    movements = movements_by_expense(period)
+    spent = spend_totals(period)
 
     for expense in month_expenses:
 
@@ -325,7 +334,7 @@ async def dashboard(
         status = entry.get("status", "pending")
         saved = min(max(0.0, entry.get("saved", 0.0)), expense["value"])
 
-        expense["deposits"] = deposits.get(expense_id, [])
+        expense["movements"] = movements.get(expense_id, [])
 
         expense["payment_status"] = status
         expense["saved"] = saved if status == "pending" else expense["value"]
@@ -336,6 +345,17 @@ async def dashboard(
 
         expense["saved_percent"] = (
             expense["saved"] / expense["value"] * 100
+            if expense["value"] > 0 else 0.0
+        )
+
+        # Money already spent out of what was put aside. It changes no
+        # total: the expense stays reserved, this only tracks where it
+        # went.
+        expense["used"] = spent.get(expense_id, 0.0)
+        expense["unused"] = expense["value"] - expense["used"]
+
+        expense["used_percent"] = (
+            max(0.0, min(expense["used"] / expense["value"] * 100, 100.0))
             if expense["value"] > 0 else 0.0
         )
 

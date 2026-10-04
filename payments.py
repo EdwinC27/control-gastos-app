@@ -2,10 +2,11 @@
 payments.py
 
 Track every expense of the month: mark it as pending, reserved or
-paid, and register the abonos (partial amounts already put aside),
-each one with its own note and timestamp.
+paid, and register its movements — abonos (money put aside) and usos
+(money spent out of it) — each one with its own note and timestamp.
 
-The status lives in data/pagos.csv and the abonos in data/abonos.csv.
+The status lives in data/pagos.csv and the movements in
+data/movimientos.csv.
 Neither changes any total: they only tell you what already went out,
 what you have gathered and how much is still missing.
 """
@@ -17,10 +18,10 @@ from common import (
     EXPENSES_FILE,
     MAX_YEAR,
     MIN_YEAR,
-    add_deposit,
+    add_movement,
     applies_to_month,
-    clear_deposits,
-    delete_deposit,
+    clear_movements,
+    delete_movement,
     normalize_payment_status,
     period_key,
     read_csv,
@@ -92,15 +93,15 @@ async def set_status(
 
 
 # ============================================================
-# ABONOS
+# MOVEMENTS: ABONOS AND USOS
 # ============================================================
 
-@router.post("/saved")
-async def register_deposit(
+@router.post("/movement")
+async def register_movement(
     expense_id: str = Form(""),
     amount: str = Form(""),
     note: str = Form(""),
-    action: str = Form("add"),
+    kind: str = Form("deposit"),
     month: int = Form(0),
     year: int = Form(0)
 ):
@@ -113,29 +114,24 @@ async def register_deposit(
     if not expense_id:
         return _back_to_dashboard(month, year)
 
-    period = period_key(month, year)
+    amount = to_amount((amount or "").replace("$", "").replace(",", ""))
 
-    if action == "reset":
-        clear_deposits(expense_id, period)
-
-    else:
-        amount = to_amount((amount or "").replace("$", "").replace(",", ""))
-
-        if amount:
-            add_deposit(
-                expense_id,
-                period,
-                amount,
-                note,
-                _expense_amount(expense_id, month, year)
-            )
+    if amount:
+        add_movement(
+            expense_id,
+            period_key(month, year),
+            amount,
+            note,
+            kind,
+            _expense_amount(expense_id, month, year)
+        )
 
     return _back_to_dashboard(month, year)
 
 
-@router.post("/saved/delete")
-async def remove_deposit(
-    deposit_id: str = Form(""),
+@router.post("/movement/delete")
+async def remove_movement(
+    movement_id: str = Form(""),
     month: int = Form(0),
     year: int = Form(0)
 ):
@@ -143,10 +139,33 @@ async def remove_deposit(
     if not _valid_period(month, year):
         return RedirectResponse(url="/", status_code=303)
 
-    deposit_id = (deposit_id or "").strip()
+    movement_id = (movement_id or "").strip()
 
-    if deposit_id:
-        delete_deposit(deposit_id)
+    if movement_id:
+        delete_movement(movement_id)
+
+    return _back_to_dashboard(month, year)
+
+
+@router.post("/movement/clear")
+async def clear_expense_movements(
+    expense_id: str = Form(""),
+    kind: str = Form(""),
+    month: int = Form(0),
+    year: int = Form(0)
+):
+
+    if not _valid_period(month, year):
+        return RedirectResponse(url="/", status_code=303)
+
+    expense_id = (expense_id or "").strip()
+
+    if expense_id:
+        clear_movements(
+            expense_id,
+            period_key(month, year),
+            kind or None
+        )
 
     return _back_to_dashboard(month, year)
 
@@ -177,8 +196,8 @@ async def set_all_statuses(
 
         set_payment_status(expense_id, period, status)
 
-        # Starting the month over also clears the abonos.
+        # Starting the month over also clears the movements.
         if status == "pending":
-            clear_deposits(expense_id, period)
+            clear_movements(expense_id, period)
 
     return _back_to_dashboard(month, year)
