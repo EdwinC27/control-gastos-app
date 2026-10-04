@@ -88,10 +88,17 @@ En el dashboard, la tabla **Gastos del mes** tiene tres botones por renglón:
 | ✅ Pagado | ya salió |
 
 Y en la columna **Ya juntado** registras abonos: si un gasto es de $12,000 y
-esta quincena juntaste $1,000, escribes `1000` y pulsas **+**. La fila te
-muestra `$1,000.00 · falta $11,000.00` con su barra de avance. Puedes abonar
-las veces que quieras, corregir con un número negativo o borrar lo juntado con
-**✕**. Cuando los abonos completan el monto, el gasto pasa solo a **Apartado**.
+esta quincena juntaste $1,000, escribes `1000`, le pones una nota si quieres
+(«quincena del 15», «venta de la bici», en qué se fue el dinero) y pulsas **+**.
+La fila te muestra `$1,000.00 · falta $11,000.00` con su barra de avance.
+
+Cada abono guarda solo su fecha y hora. Debajo aparece **«3 abonos»**: ábrelo y
+ves el historial completo del mes para ese gasto —monto, fecha, hora y nota de
+cada uno— y puedes borrar uno suelto con su **✕**.
+
+Puedes abonar las veces que quieras, corregir un error con un número negativo o
+borrar todos los abonos del gasto con el **✕** del formulario. Cuando los
+abonos completan el monto, el gasto pasa solo a **Apartado**.
 
 Arriba, la tarjeta **Pagos del mes** suma las cuatro columnas —pagado,
 apartado, abonado y lo que **falta por juntar**—. También hay atajos para *marcar todo como pagado* o
@@ -153,7 +160,8 @@ data/
 ├── gastos.csv        tus gastos
 ├── ingresos.csv      tus ingresos
 ├── categorias.csv    el catálogo de categorías
-├── pagos.csv         estado y abonos de cada gasto, por mes
+├── pagos.csv         estado de cada gasto (pagado/apartado), por mes
+├── abonos.csv        cada abono con su monto, nota, fecha y hora
 └── backups/          respaldo automático diario (últimos 30 días)
 ```
 
