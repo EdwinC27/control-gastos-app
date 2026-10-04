@@ -87,21 +87,30 @@ En el dashboard, la tabla **Gastos del mes** tiene tres botones por renglón:
 | 🏦 Apartado | ya lo separaste completo, pero no lo has pagado |
 | ✅ Pagado | ya salió |
 
-Y en la columna **Ya juntado** registras abonos: si un gasto es de $12,000 y
-esta quincena juntaste $1,000, escribes `1000`, le pones una nota si quieres
-(«quincena del 15», «venta de la bici», en qué se fue el dinero) y pulsas **+**.
-La fila te muestra `$1,000.00 · falta $11,000.00` con su barra de avance.
+La columna **Ya juntado / usado** cambia según el estado del gasto:
 
-Cada abono guarda solo su fecha y hora. Debajo aparece **«3 abonos»**: ábrelo y
-ves el historial completo del mes para ese gasto —monto, fecha, hora y nota de
-cada uno— y puedes borrar uno suelto con su **✕**.
+**Si falta por juntar**, registras *abonos*. Un gasto de $12,000 del que esta
+quincena juntaste $1,000: escribes `1000`, le pones una nota si quieres
+(«quincena del 15», «venta de la bici») y pulsas **+**. La fila muestra
+`$1,000.00 · falta $11,000.00` con su barra de avance. Cuando los abonos
+completan el monto, el gasto pasa solo a **Apartado**.
 
-Puedes abonar las veces que quieras, corregir un error con un número negativo o
-borrar todos los abonos del gasto con el **✕** del formulario. Cuando los
-abonos completan el monto, el gasto pasa solo a **Apartado**.
+**Si ya está apartado**, el dinero ya lo tienes, así que ahora registras *usos*:
+cuánto ocupaste y en qué. La gasolina de $4,000 que ya apartaste y de la que
+cargaste $600 el martes se ve como `Usado $600.00 · quedan $3,400.00`. El gasto
+sigue contando como apartado: esto solo te dice a dónde se fue el dinero.
+
+**Si ya está pagado**, no hay nada que registrar: la celda dice «Completo».
+
+Cada movimiento guarda solo su fecha y hora. Debajo aparece
+**«3 movimientos»**: ábrelo y ves el historial del mes para ese gasto —abonos y
+usos, cada uno con su monto, fecha, hora y nota—. Puedes borrar uno suelto con
+su **✕**, corregir un error registrando un monto negativo, o vaciar el
+historial con «Borrar todo el historial».
 
 Arriba, la tarjeta **Pagos del mes** suma las cuatro columnas —pagado,
-apartado, abonado y lo que **falta por juntar**—. También hay atajos para *marcar todo como pagado* o
+apartado, abonado y lo que **falta por juntar**— y, si ya usaste parte del
+dinero apartado, te dice cuánto llevas usado y cuánto queda. También hay atajos para *marcar todo como pagado* o
 *reiniciar el mes*.
 
 Esto no cambia los totales del dashboard: los gastos siguen contando completos.
@@ -161,7 +170,7 @@ data/
 ├── ingresos.csv      tus ingresos
 ├── categorias.csv    el catálogo de categorías
 ├── pagos.csv         estado de cada gasto (pagado/apartado), por mes
-├── abonos.csv        cada abono con su monto, nota, fecha y hora
+├── movimientos.csv   abonos y usos, con monto, nota, fecha y hora
 └── backups/          respaldo automático diario (últimos 30 días)
 ```
 
