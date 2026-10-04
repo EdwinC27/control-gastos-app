@@ -1751,3 +1751,117 @@ input.is-calculated {
     border-color: var(--primary);
     box-shadow: 0 0 0 3px var(--primary-light);
 }
+
+
+/* ---- abono notes and history ----------------------------- */
+
+.saved-cell {
+    min-width: 230px;
+}
+
+/* the "Completo" badge keeps its own width inside the flex column */
+.saved-cell > .badge {
+    align-self: flex-start;
+}
+
+.saved-form {
+    flex-wrap: wrap;
+}
+
+.saved-note {
+    flex: 1 1 110px;
+    min-width: 0;
+    padding: 6px 8px;
+    border: 1px solid var(--input-border);
+    border-radius: var(--radius);
+    background: var(--input-bg);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.85rem;
+}
+
+.saved-note:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+.deposit-log {
+    margin-top: 2px;
+    font-size: 0.82rem;
+}
+
+.deposit-log summary {
+    cursor: pointer;
+    color: var(--primary-text);
+    font-weight: 600;
+    list-style: none;
+}
+
+.deposit-log summary::-webkit-details-marker {
+    display: none;
+}
+
+.deposit-log summary::before {
+    content: "▸ ";
+    display: inline-block;
+    transition: transform 0.15s ease;
+}
+
+.deposit-log[open] summary::before {
+    content: "▾ ";
+}
+
+.deposit-list {
+    margin: 8px 0 0;
+    padding: 0;
+    list-style: none;
+    border-left: 2px solid var(--border);
+}
+
+.deposit-list li {
+    padding: 6px 0 6px 10px;
+}
+
+.deposit-list li + li {
+    border-top: 1px solid var(--border);
+}
+
+.deposit-head {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.deposit-head time {
+    color: var(--text-light);
+    font-size: 0.78rem;
+    white-space: nowrap;
+}
+
+.deposit-head form {
+    margin-left: auto;
+}
+
+.deposit-delete {
+    border: 0;
+    background: transparent;
+    color: var(--text-light);
+    cursor: pointer;
+    font-size: 0.85rem;
+    line-height: 1;
+    padding: 2px 4px;
+    border-radius: 4px;
+}
+
+.deposit-delete:hover {
+    color: var(--danger);
+    background: var(--danger-light);
+}
+
+.deposit-note {
+    margin: 2px 0 0;
+    color: var(--text-secondary);
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}

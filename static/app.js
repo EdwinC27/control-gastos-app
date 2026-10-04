@@ -77,7 +77,9 @@
 
     // ========================================================
     // CONFIRM BEFORE DELETING
-    // Any <form data-confirm="message"> asks for confirmation.
+    // Any <form data-confirm="message"> asks for confirmation, and so
+    // does a single <button data-confirm="message"> inside a form that
+    // does other things too.
     // ========================================================
 
     function setUpConfirmations() {
@@ -89,6 +91,20 @@
                 form.addEventListener("submit", function (event) {
 
                     if (!window.confirm(form.dataset.confirm)) {
+                        event.preventDefault();
+                    }
+
+                });
+
+            });
+
+        document
+            .querySelectorAll("button[data-confirm]")
+            .forEach(function (button) {
+
+                button.addEventListener("click", function (event) {
+
+                    if (!window.confirm(button.dataset.confirm)) {
                         event.preventDefault();
                     }
 

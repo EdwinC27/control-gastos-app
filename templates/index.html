@@ -627,8 +627,9 @@
                     </td>
 
                     <td data-value="{{ expense.saved }}">
-                        {% if expense.payment_status == "pending" %}
                         <div class="saved-cell">
+
+                            {% if expense.payment_status == "pending" %}
 
                             <div class="saved-figures">
                                 <strong>{{ expense.saved | mxn }}</strong>
@@ -659,30 +660,92 @@
                                     aria-label="Abonar a {{ expense.concept }}"
                                 >
 
+                                <input
+                                    type="text"
+                                    name="note"
+                                    class="saved-note"
+                                    maxlength="200"
+                                    placeholder="Nota (opcional)"
+                                    aria-label="Nota del abono a {{ expense.concept }}"
+                                >
+
                                 <button
                                     type="submit"
                                     name="action"
                                     value="add"
                                     class="button button-secondary button-sm"
-                                    title="Sumar este abono a lo que llevas juntado"
+                                    title="Registrar este abono"
                                 >+</button>
 
-                                {% if expense.saved > 0 %}
+                                {% if expense.deposits %}
                                 <button
                                     type="submit"
                                     name="action"
                                     value="reset"
                                     class="button button-ghost button-sm"
-                                    title="Borrar lo juntado"
+                                    title="Borrar todos los abonos de este gasto"
+                                    data-confirm="¿Borrar los {{ expense.deposits|length }} abono(s) de «{{ expense.concept }}» de {{ month_name }}?"
                                 >✕</button>
                                 {% endif %}
 
                             </form>
 
+                            {% else %}
+
+                            <span class="badge badge-success">Completo</span>
+
+                            {% endif %}
+
+                            {% if expense.deposits %}
+                            <details class="deposit-log">
+
+                                <summary>
+                                    {{ expense.deposits|length }}
+                                    {% if expense.deposits|length == 1 %}abono{% else %}abonos{% endif %}
+                                </summary>
+
+                                <ul class="deposit-list">
+                                    {% for deposit in expense.deposits %}
+                                    <li>
+
+                                        <div class="deposit-head">
+                                            <strong class="{% if deposit.amount < 0 %}amount-negative{% endif %}">
+                                                {{ deposit.amount | mxn }}
+                                            </strong>
+
+                                            <time datetime="{{ deposit.created_at }}">
+                                                {{ deposit.created_at | datetime_mx }}
+                                            </time>
+
+                                            <form
+                                                method="post"
+                                                action="/payments/saved/delete"
+                                                data-confirm="¿Borrar el abono de {{ deposit.amount | mxn }} del {{ deposit.created_at | datetime_mx }}?"
+                                            >
+                                                <input type="hidden" name="deposit_id" value="{{ deposit.id }}">
+                                                <input type="hidden" name="month" value="{{ month }}">
+                                                <input type="hidden" name="year" value="{{ year }}">
+                                                <button
+                                                    type="submit"
+                                                    class="deposit-delete"
+                                                    title="Borrar este abono"
+                                                    aria-label="Borrar el abono de {{ deposit.amount | mxn }}"
+                                                >✕</button>
+                                            </form>
+                                        </div>
+
+                                        {% if deposit.note %}
+                                        <p class="deposit-note">{{ deposit.note }}</p>
+                                        {% endif %}
+
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+
+                            </details>
+                            {% endif %}
+
                         </div>
-                        {% else %}
-                        <span class="badge badge-success">Completo</span>
-                        {% endif %}
                     </td>
 
                     <td data-value="{{ expense.payment_status }}">
