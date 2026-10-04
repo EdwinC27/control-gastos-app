@@ -102,11 +102,23 @@ sigue contando como apartado: esto solo te dice a dónde se fue el dinero.
 
 **Si ya está pagado**, no hay nada que registrar: la celda dice «Completo».
 
-Cada movimiento guarda solo su fecha y hora. Debajo aparece
-**«3 movimientos»**: ábrelo y ves el historial del mes para ese gasto —abonos y
-usos, cada uno con su monto, fecha, hora y nota—. Puedes borrar uno suelto con
-su **✕**, corregir un error registrando un monto negativo, o vaciar el
-historial con «Borrar todo el historial».
+Cada movimiento guarda solo su fecha y hora. Bajo el formulario aparece el
+enlace **«3 movimientos →»**, que te lleva a la pestaña **Movimientos** ya
+filtrada por ese gasto.
+
+### 6. La pestaña Movimientos
+
+Todos los abonos y usos del mes en un solo lugar: cuánto llevas abonado, cuánto
+usado y la lista completa con fecha, hora, gasto, categoría, tipo, monto y nota.
+
+Puedes **buscar** por concepto o nota, **filtrar** por tipo (abono / uso) y por
+categoría, **ordenar** por cualquier columna, **borrar** un movimiento suelto y
+**registrar** uno nuevo desde ahí mismo: eliges el gasto del mes, el monto y la
+nota. Para corregir un error, registra el mismo movimiento con monto negativo.
+
+El **tipo no se elige**: lo deduce el estado del gasto —si falta por juntar es
+un abono, si ya está apartado es un uso— y te lo muestra antes de guardar. Los
+gastos ya pagados no aparecen en la lista, porque no hay nada que registrarles.
 
 Arriba, la tarjeta **Pagos del mes** suma las cuatro columnas —pagado,
 apartado, abonado y lo que **falta por juntar**— y, si ya usaste parte del
@@ -118,7 +130,7 @@ Es solo para saber por dónde vas.
 
 Cada mes lleva su propio registro, así que al cambiar de mes empiezas limpio.
 
-### 5. Estado financiero
+### 7. Estado financiero
 
 Se calcula con el porcentaje de tu ingreso que te queda disponible:
 
@@ -130,7 +142,7 @@ Se calcula con el porcentaje de tu ingreso que te queda disponible:
 
 La barra de **ingreso comprometido** usa esos mismos colores.
 
-### 6. Tus categorías
+### 8. Tus categorías
 
 **Categorías** en el menú lateral. Ahí puedes:
 
@@ -142,7 +154,7 @@ La barra de **ingreso comprometido** usa esos mismos colores.
 
 No hay que tocar el código para nada de esto.
 
-### 7. Trabajar con las tablas
+### 9. Trabajar con las tablas
 
 En **Gastos** e **Ingresos**:
 
@@ -154,7 +166,7 @@ En **Gastos** e **Ingresos**:
   inactivo no cuenta en ningún mes.
 - **📋** duplica un gasto y te lleva directo a editar la copia.
 
-### 8. Otros detalles
+### 10. Otros detalles
 
 - **Modo oscuro**: botón abajo a la izquierda. Se recuerda entre sesiones.
 - **Navegar entre meses**: flechas ← → arriba del dashboard, o el selector de
@@ -193,7 +205,8 @@ control_gastos/
 ├── common.py        lógica compartida: CSV, validaciones, plazos, filtros
 ├── expenses.py      rutas de gastos
 ├── income.py        rutas de ingresos
-├── payments.py      marcar pagado / apartado / pendiente
+├── payments.py      marcar pagado / apartado / pendiente y registrar movimientos
+├── movements.py     la pestaña de abonos y usos del mes
 ├── categories.py    administrar el catálogo de categorías
 ├── templates/       plantillas HTML (Jinja2)
 ├── static/          estilos y JavaScript
