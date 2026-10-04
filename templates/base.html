@@ -61,6 +61,13 @@
                 <span>Ingresos</span>
             </a>
 
+            <a href="/movements"
+               class="nav-item {% if active_page == 'movements' %}active{% endif %}"
+               {% if active_page == 'movements' %}aria-current="page"{% endif %}>
+                <span class="nav-icon">🔁</span>
+                <span>Movimientos</span>
+            </a>
+
             <a href="/categories"
                class="nav-item {% if active_page == 'categories' %}active{% endif %}"
                {% if active_page == 'categories' %}aria-current="page"{% endif %}>

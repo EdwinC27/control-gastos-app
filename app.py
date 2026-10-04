@@ -37,6 +37,7 @@ from common import (
 from categories import router as categories_router
 from expenses import router as expenses_router
 from income import router as income_router
+from movements import router as movements_router
 from payments import router as payments_router
 
 
@@ -55,6 +56,7 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 app.include_router(expenses_router)
 app.include_router(income_router)
 app.include_router(payments_router)
+app.include_router(movements_router)
 app.include_router(categories_router)
 
 
