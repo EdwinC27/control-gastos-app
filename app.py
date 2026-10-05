@@ -10,7 +10,7 @@ Open:  http://127.0.0.1:2004
 from datetime import date
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 from common import (
@@ -63,6 +63,17 @@ app.include_router(categories_router)
 # Financial status thresholds (% of income still available)
 POSITIVE_THRESHOLD = 15.0
 BALANCED_THRESHOLD = 5.0
+
+
+# ============================================================
+# FAVICON
+# ============================================================
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    """Browsers ask for /favicon.ico on their own."""
+
+    return FileResponse(STATIC_DIR / "favicon.ico")
 
 
 # ============================================================

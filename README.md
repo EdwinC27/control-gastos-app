@@ -209,7 +209,7 @@ control_gastos/
 ├── movements.py     la pestaña de abonos y usos del mes
 ├── categories.py    administrar el catálogo de categorías
 ├── templates/       plantillas HTML (Jinja2)
-├── static/          estilos y JavaScript
+├── static/          estilos, JavaScript e iconos de la app
 └── data/            tus datos
 ```
 
