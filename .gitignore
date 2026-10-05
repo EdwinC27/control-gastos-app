@@ -1,11 +1,17 @@
 # Datos personales: NO se suben a GitHub
 data/
 
+# Ruta local de pythonw.exe que escribe servicio/instalar.ps1
+servicio/pythonw.txt
+
 # Python
 __pycache__/
 *.py[cod]
 .venv/
 venv/
+
+# Carpeta donde el escritorio deja los archivos que te comparto
+Claude outputs/
 
 # Editores / sistema
 .vscode/

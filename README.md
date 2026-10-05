@@ -39,6 +39,30 @@ Para cerrarla, `Ctrl + C` en la terminal.
 > La app se recarga sola cuando cambias un archivo del código, así que no hace
 > falta reiniciarla mientras editas.
 
+### Dejarla corriendo sola
+
+Si no quieres abrir la terminal cada vez, instálala como tarea de Windows:
+arranca sola al iniciar sesión, sin ventana, en el mismo puerto 2004.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\servicio\instalar.ps1
+```
+
+Eso hace tres cosas: crea la tarea programada **Control de Gastos** (se reinicia
+sola si se cae), deja un acceso directo con el icono de la app en tu escritorio,
+y la arranca en ese momento. No pide permisos de administrador.
+
+Para quitarlo todo:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\servicio\desinstalar.ps1
+```
+
+Corriendo así no hay consola donde ver errores: todo queda en
+`data/servidor.log`. Y como la tarea usa `servidor.py` en vez de `app.py`, no
+recarga al cambiar el código — si editas algo, reinicia la tarea desde el
+Programador de tareas o corre el desinstalador y el instalador otra vez.
+
 ---
 
 ## Guía rápida de uso
@@ -202,6 +226,8 @@ sale mal.
 ```
 control_gastos/
 ├── app.py           arranque de la app y dashboard
+├── servidor.py      arranque en segundo plano, sin recarga y con log
+├── servicio/        scripts para instalarla como tarea de Windows
 ├── common.py        lógica compartida: CSV, validaciones, plazos, filtros
 ├── expenses.py      rutas de gastos
 ├── income.py        rutas de ingresos
